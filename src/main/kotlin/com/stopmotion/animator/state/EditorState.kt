@@ -15,7 +15,7 @@ import java.io.File
 import javax.swing.JFileChooser
 import javax.swing.filechooser.FileNameExtensionFilter
 
-class EditorState(val scope: CoroutineScope) {
+class EditorState(val scope: CoroutineScope = CoroutineScope(Dispatchers.Default)) {
 
     val audioEngine = AudioEngine()
 
@@ -61,6 +61,12 @@ class EditorState(val scope: CoroutineScope) {
     var isExporting by mutableStateOf(false)
     var exportProgress by mutableStateOf(0f)
     var exportMessage by mutableStateOf("")
+
+    // Camera Capture Snap Trigger Callback
+    var onCameraSnapRequested: (() -> Unit)? = null
+    fun triggerCameraSnap() {
+        onCameraSnapRequested?.invoke()
+    }
 
     // Status toast
     var toastMessage by mutableStateOf<String?>(null)

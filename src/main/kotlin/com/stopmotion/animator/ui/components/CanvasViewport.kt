@@ -377,36 +377,46 @@ fun PlaybackTransportBar(state: EditorState) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            IconButton(onClick = { state.jumpToStart() }) {
-                Icon(Icons.Default.FirstPage, "Jump to Start", tint = StudioTextPrimary)
+            StudioTooltip("Jump to Start", "Home") {
+                IconButton(onClick = { state.jumpToStart() }) {
+                    Icon(Icons.Default.FirstPage, "Jump to Start", tint = StudioTextPrimary)
+                }
             }
 
-            IconButton(onClick = { state.stepFrame(-1) }) {
-                Icon(Icons.Default.ChevronLeft, "Step Back (-1)", tint = StudioTextPrimary)
+            StudioTooltip("Step Back (-1 Frame)", "Left Arrow") {
+                IconButton(onClick = { state.stepFrame(-1) }) {
+                    Icon(Icons.Default.ChevronLeft, "Step Back (-1)", tint = StudioTextPrimary)
+                }
             }
 
             // Big Play / Pause Button
-            IconButton(
-                onClick = { state.togglePlayback() },
-                modifier = Modifier
-                    .size(46.dp)
-                    .clip(CircleShape)
-                    .background(StudioPrimary)
-            ) {
-                Icon(
-                    imageVector = if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = if (state.isPlaying) "Pause" else "Play",
-                    tint = Color.White,
-                    modifier = Modifier.size(26.dp)
-                )
+            StudioTooltip(if (state.isPlaying) "Pause" else "Play", "Spacebar") {
+                IconButton(
+                    onClick = { state.togglePlayback() },
+                    modifier = Modifier
+                        .size(46.dp)
+                        .clip(CircleShape)
+                        .background(StudioPrimary)
+                ) {
+                    Icon(
+                        imageVector = if (state.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = if (state.isPlaying) "Pause" else "Play",
+                        tint = Color.White,
+                        modifier = Modifier.size(26.dp)
+                    )
+                }
             }
 
-            IconButton(onClick = { state.stepFrame(1) }) {
-                Icon(Icons.Default.ChevronRight, "Step Forward (+1)", tint = StudioTextPrimary)
+            StudioTooltip("Step Forward (+1 Frame)", "Right Arrow") {
+                IconButton(onClick = { state.stepFrame(1) }) {
+                    Icon(Icons.Default.ChevronRight, "Step Forward (+1)", tint = StudioTextPrimary)
+                }
             }
 
-            IconButton(onClick = { state.jumpToEnd() }) {
-                Icon(Icons.Default.LastPage, "Jump to End", tint = StudioTextPrimary)
+            StudioTooltip("Jump to End", "End") {
+                IconButton(onClick = { state.jumpToEnd() }) {
+                    Icon(Icons.Default.LastPage, "Jump to End", tint = StudioTextPrimary)
+                }
             }
         }
 
@@ -415,26 +425,30 @@ fun PlaybackTransportBar(state: EditorState) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            IconButton(
-                onClick = { state.isLooping = !state.isLooping },
-                modifier = Modifier.size(36.dp)
-            ) {
-                Icon(
-                    Icons.Default.Repeat,
-                    "Loop Playback",
-                    tint = if (state.isLooping) StudioPrimary else StudioTextMuted
-                )
+            StudioTooltip("Loop Playback") {
+                IconButton(
+                    onClick = { state.isLooping = !state.isLooping },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Repeat,
+                        "Loop Playback",
+                        tint = if (state.isLooping) StudioPrimary else StudioTextMuted
+                    )
+                }
             }
 
-            IconButton(
-                onClick = { state.isPingPong = !state.isPingPong },
-                modifier = Modifier.size(36.dp)
-            ) {
-                Icon(
-                    Icons.Default.SyncAlt,
-                    "Ping-Pong Playback",
-                    tint = if (state.isPingPong) StudioSecondary else StudioTextMuted
-                )
+            StudioTooltip("Ping-Pong Reverse Playback") {
+                IconButton(
+                    onClick = { state.isPingPong = !state.isPingPong },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        Icons.Default.SyncAlt,
+                        "Ping-Pong Playback",
+                        tint = if (state.isPingPong) StudioSecondary else StudioTextMuted
+                    )
+                }
             }
         }
     }

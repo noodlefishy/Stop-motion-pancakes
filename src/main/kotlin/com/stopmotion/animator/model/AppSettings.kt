@@ -35,5 +35,18 @@ data class AppSettings(
     val exportQualityCrf: Int = 18, // 18 = High cinematic quality, 23 = Standard
     val defaultExportFormat: String = "MP4",
     val autoSaveMinutes: Int = 5,
-    val maxCacheFrames: Int = 60
+    val maxCacheFrames: Int = 60,
+
+    // 6. Appearance & Themes
+    val themePreset: AppThemePreset = AppThemePreset.OBSIDIAN_INDIGO
 )
+
+@Serializable
+enum class AppThemePreset(val displayName: String, val subtitle: String) {
+    OBSIDIAN_INDIGO("Obsidian Indigo", "Deep dark canvas with electric indigo & cyan accents"),
+    CYBER_CYAN("Cyber Cyan", "Pitch black synthwave with neon cyan & vivid magenta"),
+    SUNSET_AMBER("Sunset Amber", "Warm analog studio charcoal with amber & gold tones"),
+    EMERALD_STUDIO("Emerald Studio", "Deep pine slate with vibrant emerald & mint highlights"),
+    NEON_ROSE("Neon Rose", "Midnight velvet with striking neon rose & violet accents"),
+    MONOCHROME_SLATE("Monochrome Slate", "Clean graphite with high-clarity neutral accents")
+}

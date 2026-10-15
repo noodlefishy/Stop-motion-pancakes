@@ -323,18 +323,20 @@ private fun FrameTabContent(state: EditorState) {
             SectionHeader(title = "FRAME ACTIONS", icon = Icons.Default.DeleteOutline)
             Spacer(Modifier.height(8.dp))
 
-            Button(
-                onClick = { state.deleteSelectedFrames() },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(6.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFFEF4444).copy(alpha = 0.2f),
-                    contentColor = Color(0xFFEF4444)
-                )
-            ) {
-                Icon(Icons.Default.Delete, null, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(6.dp))
-                Text("Delete Frame #${state.selectedFrameIndex + 1}", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            StudioTooltip("Delete Selected Frame", "Backspace / Del") {
+                Button(
+                    onClick = { state.deleteSelectedFrames() },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(6.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFEF4444).copy(alpha = 0.2f),
+                        contentColor = Color(0xFFEF4444)
+                    )
+                ) {
+                    Icon(Icons.Default.Delete, null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Delete Frame #${state.selectedFrameIndex + 1}", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
             }
         }
     }

@@ -148,4 +148,42 @@ class StopMotionEditorTest {
             assertEquals("Blue mismatch for $hex", expB, parsedAwt.blue)
         }
     }
+
+    @Test
+    fun testThemePresetsAndPalettes() {
+        val presets = AppThemePreset.values()
+        assertEquals(6, presets.size)
+
+        for (preset in presets) {
+            val palette = com.stopmotion.animator.ui.theme.StudioPalettes.get(preset)
+            assertNotNull(palette.dark)
+            assertNotNull(palette.surface)
+            assertNotNull(palette.card)
+            assertNotNull(palette.primary)
+            assertNotNull(palette.secondary)
+            assertNotNull(palette.accent)
+        }
+    }
+
+    @Test
+    fun testAppSettingsThemePresetSerialization() {
+        val original = AppSettings(themePreset = AppThemePreset.CYBER_CYAN)
+        val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+        val serialized = json.encodeToString(AppSettings.serializer(), original)
+        val deserialized = json.decodeFromString(AppSettings.serializer(), serialized)
+
+        assertEquals(AppThemePreset.CYBER_CYAN, deserialized.themePreset)
+    }
+
+    @Test
+    fun testCameraSnapCallbackTrigger() {
+        var snapTriggered = false
+        val state = com.stopmotion.animator.state.EditorState()
+        state.onCameraSnapRequested = {
+            snapTriggered = true
+        }
+
+        state.triggerCameraSnap()
+        assertTrue("Camera snap callback should be called", snapTriggered)
+    }
 }

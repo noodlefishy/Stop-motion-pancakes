@@ -43,10 +43,17 @@ fun main() = application {
         onKeyEvent = { keyEvent ->
             if (keyEvent.type == KeyEventType.KeyDown) {
                 when {
-                    // Space: Play / Pause
-                    keyEvent.key == Key.Spacebar -> {
-                        editorState.togglePlayback()
-                        true
+                    // Spacebar or Enter
+                    keyEvent.key == Key.Spacebar || keyEvent.key == Key.Enter -> {
+                        if (editorState.isCameraCaptureDialogVisible) {
+                            editorState.triggerCameraSnap()
+                            true
+                        } else if (keyEvent.key == Key.Spacebar) {
+                            editorState.togglePlayback()
+                            true
+                        } else {
+                            false
+                        }
                     }
                     // Left Arrow: Step -1 frame
                     keyEvent.key == Key.DirectionLeft -> {
@@ -220,7 +227,7 @@ fun main() = application {
             }
         }
 
-        StopMotionTheme {
+        StopMotionTheme(preset = editorState.settings.themePreset) {
             Box(modifier = Modifier.fillMaxSize().background(StudioDark)) {
                 Column(modifier = Modifier.fillMaxSize()) {
                     // 1. Top Bar

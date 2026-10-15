@@ -32,6 +32,7 @@ fun LeftToolbar(state: EditorState) {
         ToolIconButton(
             icon = Icons.Default.NearMe,
             tooltip = "Select / Pan Tool",
+            shortcut = "V",
             isSelected = state.activeTool == EditorTool.SELECT,
             onClick = { state.activeTool = EditorTool.SELECT }
         )
@@ -39,6 +40,7 @@ fun LeftToolbar(state: EditorState) {
         ToolIconButton(
             icon = Icons.Default.Edit,
             tooltip = "Doodle Pen (Draw on frame)",
+            shortcut = "B",
             isSelected = state.activeTool == EditorTool.DRAW_PEN,
             onClick = {
                 state.activeTool = EditorTool.DRAW_PEN
@@ -49,6 +51,7 @@ fun LeftToolbar(state: EditorState) {
         ToolIconButton(
             icon = Icons.Default.AutoFixHigh,
             tooltip = "Neon Glow / Lightsaber FX",
+            shortcut = "G",
             isSelected = state.activeTool == EditorTool.DRAW_GLOW,
             selectedColor = StudioSecondary,
             onClick = {
@@ -88,6 +91,7 @@ fun LeftToolbar(state: EditorState) {
         GuideIconButton(
             icon = Icons.Default.Layers,
             tooltip = "Onion Skinning",
+            shortcut = "O",
             isActive = state.onionSkinEnabled,
             activeColor = StudioPrimary,
             onClick = { state.onionSkinEnabled = !state.onionSkinEnabled }
@@ -134,25 +138,28 @@ fun LeftToolbar(state: EditorState) {
 private fun ToolIconButton(
     icon: ImageVector,
     tooltip: String,
+    shortcut: String? = null,
     isSelected: Boolean,
     selectedColor: Color = StudioPrimary,
     onClick: () -> Unit
 ) {
-    IconButton(
-        onClick = onClick,
-        modifier = Modifier
-            .size(40.dp)
-            .background(
-                if (isSelected) selectedColor.copy(alpha = 0.25f) else Color.Transparent,
-                shape = RoundedCornerShape(8.dp)
+    StudioTooltip(text = tooltip, shortcut = shortcut) {
+        IconButton(
+            onClick = onClick,
+            modifier = Modifier
+                .size(40.dp)
+                .background(
+                    if (isSelected) selectedColor.copy(alpha = 0.25f) else Color.Transparent,
+                    shape = RoundedCornerShape(8.dp)
+                )
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = tooltip,
+                tint = if (isSelected) selectedColor else StudioTextSecondary,
+                modifier = Modifier.size(20.dp)
             )
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = tooltip,
-            tint = if (isSelected) selectedColor else StudioTextSecondary,
-            modifier = Modifier.size(20.dp)
-        )
+        }
     }
 }
 
@@ -160,24 +167,27 @@ private fun ToolIconButton(
 private fun GuideIconButton(
     icon: ImageVector,
     tooltip: String,
+    shortcut: String? = null,
     isActive: Boolean,
     activeColor: Color,
     onClick: () -> Unit
 ) {
-    IconButton(
-        onClick = onClick,
-        modifier = Modifier
-            .size(38.dp)
-            .background(
-                if (isActive) activeColor.copy(alpha = 0.2f) else Color.Transparent,
-                shape = RoundedCornerShape(8.dp)
+    StudioTooltip(text = tooltip, shortcut = shortcut) {
+        IconButton(
+            onClick = onClick,
+            modifier = Modifier
+                .size(38.dp)
+                .background(
+                    if (isActive) activeColor.copy(alpha = 0.2f) else Color.Transparent,
+                    shape = RoundedCornerShape(8.dp)
+                )
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = tooltip,
+                tint = if (isActive) activeColor else StudioTextMuted,
+                modifier = Modifier.size(18.dp)
             )
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = tooltip,
-            tint = if (isActive) activeColor else StudioTextMuted,
-            modifier = Modifier.size(18.dp)
-        )
+        }
     }
 }

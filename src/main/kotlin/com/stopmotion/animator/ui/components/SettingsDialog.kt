@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.stopmotion.animator.model.AppSettings
+import com.stopmotion.animator.model.AppThemePreset
 import com.stopmotion.animator.model.DoodleStyle
 import com.stopmotion.animator.model.OnionTintMode
 import com.stopmotion.animator.state.EditorState
@@ -35,6 +36,7 @@ fun SettingsDialog(state: EditorState) {
     var selectedCategory by remember { mutableStateOf(0) }
 
     val categories = listOf(
+        SettingsCategory("Appearance & Themes", Icons.Default.Palette),
         SettingsCategory("Camera & Capture", Icons.Default.Videocam),
         SettingsCategory("Onion Skin & View", Icons.Default.Layers),
         SettingsCategory("Timeline & Playback", Icons.Default.Speed),
@@ -46,8 +48,8 @@ fun SettingsDialog(state: EditorState) {
     Dialog(onDismissRequest = { state.isSettingsDialogVisible = false }) {
         Surface(
             modifier = Modifier
-                .width(720.dp)
-                .height(520.dp)
+                .width(780.dp)
+                .height(580.dp)
                 .border(1.dp, StudioBorder, RoundedCornerShape(12.dp)),
             shape = RoundedCornerShape(12.dp),
             color = StudioSurface
@@ -86,7 +88,7 @@ fun SettingsDialog(state: EditorState) {
                     // Left Navigation Column
                     Column(
                         modifier = Modifier
-                            .width(200.dp)
+                            .width(210.dp)
                             .fillMaxHeight()
                             .background(StudioDark)
                             .padding(vertical = 12.dp, horizontal = 10.dp),
@@ -102,7 +104,7 @@ fun SettingsDialog(state: EditorState) {
                                 color = if (isSelected) StudioPrimary.copy(alpha = 0.2f) else Color.Transparent
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 9.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
@@ -130,15 +132,19 @@ fun SettingsDialog(state: EditorState) {
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxHeight()
-                            .padding(20.dp)
+                            .padding(22.dp)
                     ) {
                         when (selectedCategory) {
-                            0 -> CameraSettingsPanel(currentSettings) { currentSettings = it }
-                            1 -> OnionSkinSettingsPanel(currentSettings) { currentSettings = it }
-                            2 -> TimelineSettingsPanel(currentSettings) { currentSettings = it }
-                            3 -> DoodleSettingsPanel(currentSettings) { currentSettings = it }
-                            4 -> ExportSettingsPanel(currentSettings) { currentSettings = it }
-                            5 -> SystemSettingsPanel(state) { currentSettings = it }
+                            0 -> AppearanceSettingsPanel(currentSettings) { updated ->
+                                currentSettings = updated
+                                CurrentStudioPalette = StudioPalettes.get(updated.themePreset)
+                            }
+                            1 -> CameraSettingsPanel(currentSettings) { currentSettings = it }
+                            2 -> OnionSkinSettingsPanel(currentSettings) { currentSettings = it }
+                            3 -> TimelineSettingsPanel(currentSettings) { currentSettings = it }
+                            4 -> DoodleSettingsPanel(currentSettings) { currentSettings = it }
+                            5 -> ExportSettingsPanel(currentSettings) { currentSettings = it }
+                            6 -> SystemSettingsPanel(state) { currentSettings = it }
                         }
                     }
                 }
@@ -159,13 +165,18 @@ fun SettingsDialog(state: EditorState) {
                         val def = AppSettings()
                         currentSettings = def
                         state.resetSettingsToDefault()
+                        CurrentStudioPalette = StudioPalettes.get(def.themePreset)
                     }) {
                         Text("Reset to Defaults", color = StudioTextMuted, fontSize = 12.sp)
                     }
 
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         OutlinedButton(
-                            onClick = { state.isSettingsDialogVisible = false },
+                            onClick = {
+                                // Revert live preview if canceled
+                                CurrentStudioPalette = StudioPalettes.get(state.settings.themePreset)
+                                state.isSettingsDialogVisible = false
+                            },
                             shape = RoundedCornerShape(6.dp)
                         ) {
                             Text("Cancel", fontSize = 12.sp)
@@ -193,6 +204,118 @@ fun SettingsDialog(state: EditorState) {
 private data class SettingsCategory(val title: String, val icon: ImageVector)
 
 @Composable
+private fun AppearanceSettingsPanel(settings: AppSettings, onUpdate: (AppSettings) -> Unit) {
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        item {
+            Text("APPEARANCE & COLOR THEMES", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = StudioPrimary)
+            Spacer(Modifier.height(4.dp))
+            Text("Choose a curated visual theme for the stop motion animation workspace.", fontSize = 11.sp, color = StudioTextSecondary)
+        }
+
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                AppThemePreset.values().forEach { preset ->
+                    val isSelected = settings.themePreset == preset
+                    val palette = StudioPalettes.get(preset)
+
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .border(
+                                width = if (isSelected) 2.dp else 1.dp,
+                                color = if (isSelected) StudioPrimary else StudioBorder,
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                            .clickable {
+                                onUpdate(settings.copy(themePreset = preset))
+                            },
+                        color = if (isSelected) StudioCard else StudioDark
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                // Theme Color Swatches Preview
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(20.dp)
+                                            .clip(CircleShape)
+                                            .background(palette.dark)
+                                            .border(1.dp, Color.White.copy(alpha = 0.3f), CircleShape)
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .size(20.dp)
+                                            .clip(CircleShape)
+                                            .background(palette.surface)
+                                            .border(1.dp, Color.White.copy(alpha = 0.3f), CircleShape)
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .size(20.dp)
+                                            .clip(CircleShape)
+                                            .background(palette.primary)
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .size(20.dp)
+                                            .clip(CircleShape)
+                                            .background(palette.secondary)
+                                    )
+                                }
+
+                                Column {
+                                    Text(
+                                        text = preset.displayName,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isSelected) StudioPrimary else StudioTextPrimary
+                                    )
+                                    Text(
+                                        text = preset.subtitle,
+                                        fontSize = 11.sp,
+                                        color = StudioTextSecondary
+                                    )
+                                }
+                            }
+
+                            if (isSelected) {
+                                Surface(
+                                    color = StudioPrimary,
+                                    shape = CircleShape,
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                    }
+                                }
+                            } else {
+                                Box(
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .border(1.5.dp, StudioBorder, CircleShape)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun CameraSettingsPanel(settings: AppSettings, onUpdate: (AppSettings) -> Unit) {
     LazyColumn(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item {
@@ -202,7 +325,7 @@ private fun CameraSettingsPanel(settings: AppSettings, onUpdate: (AppSettings) -
         }
 
         item {
-            SettingRow(
+            SettingInlineRow(
                 title = "Default Capture Resolution",
                 subtitle = "Preferred resolution for stills from Continuity Camera"
             ) {
@@ -253,14 +376,20 @@ private fun CameraSettingsPanel(settings: AppSettings, onUpdate: (AppSettings) -
         }
 
         item {
-            SettingSliderRow(
-                title = "Default Countdown Timer",
-                valueLabel = "${settings.defaultCountdownSeconds}s",
-                value = settings.defaultCountdownSeconds.toFloat(),
-                valueRange = 0f..5f,
-                steps = 4,
-                onValueChange = { onUpdate(settings.copy(defaultCountdownSeconds = it.toInt())) }
-            )
+            SettingStackedRow(
+                title = "Countdown Timer Duration",
+                subtitle = "Self-timer delay before snapping frame"
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(0 to "Off", 2 to "2s", 3 to "3s", 5 to "5s", 10 to "10s").forEach { (sec, label) ->
+                        FilterChip(
+                            selected = settings.defaultCountdownSeconds == sec,
+                            onClick = { onUpdate(settings.copy(defaultCountdownSeconds = sec)) },
+                            label = { Text(label, fontSize = 11.sp) }
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -271,62 +400,60 @@ private fun OnionSkinSettingsPanel(settings: AppSettings, onUpdate: (AppSettings
         item {
             Text("ONION SKIN & COMPOSITION GUIDES", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = StudioPrimary)
             Spacer(Modifier.height(4.dp))
-            Text("Fine-tune how past and future frames ghost over your viewport.", fontSize = 11.sp, color = StudioTextSecondary)
+            Text("Tune ghosting transparency and tint for seamless motion alignment.", fontSize = 11.sp, color = StudioTextSecondary)
         }
 
         item {
             SettingSliderRow(
-                title = "Default Past Frames",
-                valueLabel = "${settings.defaultOnionPastCount} frames",
-                value = settings.defaultOnionPastCount.toFloat(),
-                valueRange = 1f..5f,
-                steps = 3,
-                onValueChange = { onUpdate(settings.copy(defaultOnionPastCount = it.toInt())) }
-            )
-        }
-
-        item {
-            SettingSliderRow(
-                title = "Default Future Frames",
-                valueLabel = "${settings.defaultOnionFutureCount} frames",
-                value = settings.defaultOnionFutureCount.toFloat(),
-                valueRange = 0f..5f,
-                steps = 4,
-                onValueChange = { onUpdate(settings.copy(defaultOnionFutureCount = it.toInt())) }
-            )
-        }
-
-        item {
-            SettingSliderRow(
-                title = "Default Ghost Opacity",
+                title = "Default Onion Skin Opacity",
                 valueLabel = "${(settings.defaultOnionOpacity * 100).toInt()}%",
                 value = settings.defaultOnionOpacity,
                 valueRange = 0.1f..0.9f,
-                steps = 7,
                 onValueChange = { onUpdate(settings.copy(defaultOnionOpacity = it)) }
             )
         }
 
         item {
-            SettingRow(title = "Default Tint Color Mode", subtitle = "Ghost color scheme") {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    FilterChip(
-                        selected = settings.defaultTintMode == OnionTintMode.RED_GREEN_TINT,
-                        onClick = { onUpdate(settings.copy(defaultTintMode = OnionTintMode.RED_GREEN_TINT)) },
-                        label = { Text("Red / Green", fontSize = 10.sp) }
-                    )
-                    FilterChip(
-                        selected = settings.defaultTintMode == OnionTintMode.TRUE_COLOR,
-                        onClick = { onUpdate(settings.copy(defaultTintMode = OnionTintMode.TRUE_COLOR)) },
-                        label = { Text("True Color", fontSize = 10.sp) }
-                    )
+            SettingStackedRow(
+                title = "Past Frames Count",
+                subtitle = "Number of preceding frames ghosted in onion skin"
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    (1..4).forEach { count ->
+                        FilterChip(
+                            selected = settings.defaultOnionPastCount == count,
+                            onClick = { onUpdate(settings.copy(defaultOnionPastCount = count)) },
+                            label = { Text("$count frame${if (count > 1) "s" else ""}", fontSize = 11.sp) }
+                        )
+                    }
+                }
+            }
+        }
+
+        item {
+            SettingStackedRow(
+                title = "Color Tint Mode",
+                subtitle = "Color differentiation for past vs future frames"
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(
+                        OnionTintMode.RED_GREEN_TINT to "Red / Green Tint",
+                        OnionTintMode.TRUE_COLOR to "True Color",
+                        OnionTintMode.MONOCHROME to "Monochrome"
+                    ).forEach { (mode, label) ->
+                        FilterChip(
+                            selected = settings.defaultTintMode == mode,
+                            onClick = { onUpdate(settings.copy(defaultTintMode = mode)) },
+                            label = { Text(label, fontSize = 11.sp) }
+                        )
+                    }
                 }
             }
         }
 
         item {
             SettingSwitchRow(
-                title = "Show Rule-of-Thirds Grid on Launch",
+                title = "Show Rule-of-Thirds Grid by Default",
                 subtitle = "Display 3x3 alignment lines automatically",
                 checked = settings.showGridByDefault,
                 onCheckedChange = { onUpdate(settings.copy(showGridByDefault = it)) }
@@ -345,13 +472,16 @@ private fun TimelineSettingsPanel(settings: AppSettings, onUpdate: (AppSettings)
         }
 
         item {
-            SettingRow(title = "Default Project FPS", subtitle = "Standard animation frame rate") {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            SettingStackedRow(
+                title = "Default Project FPS",
+                subtitle = "Standard animation frame rate"
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf(8, 12, 15, 24, 30).forEach { fps ->
                         FilterChip(
                             selected = settings.defaultFps == fps,
                             onClick = { onUpdate(settings.copy(defaultFps = fps)) },
-                            label = { Text("${fps} FPS", fontSize = 10.sp) }
+                            label = { Text("${fps} FPS", fontSize = 11.sp) }
                         )
                     }
                 }
@@ -359,13 +489,16 @@ private fun TimelineSettingsPanel(settings: AppSettings, onUpdate: (AppSettings)
         }
 
         item {
-            SettingRow(title = "Default Frame Hold (Exposures)", subtitle = "Hold duration for newly captured/imported frames") {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            SettingStackedRow(
+                title = "Default Frame Hold (Exposures)",
+                subtitle = "Hold duration for newly captured/imported frames"
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf(1 to "1s (Singles)", 2 to "2s (Doubles)", 3 to "3s (Triples)").forEach { (h, label) ->
                         FilterChip(
                             selected = settings.defaultHoldDuration == h,
                             onClick = { onUpdate(settings.copy(defaultHoldDuration = h)) },
-                            label = { Text(label, fontSize = 10.sp) }
+                            label = { Text(label, fontSize = 11.sp) }
                         )
                     }
                 }
@@ -402,8 +535,11 @@ private fun DoodleSettingsPanel(settings: AppSettings, onUpdate: (AppSettings) -
         }
 
         item {
-            SettingRow(title = "Default Doodle Style", subtitle = "Active brush style on pen launch") {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            SettingStackedRow(
+                title = "Default Doodle Style",
+                subtitle = "Active brush style on pen launch"
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf(
                         DoodleStyle.SOLID_PEN to "Pen",
                         DoodleStyle.NEON_GLOW to "Glow",
@@ -413,7 +549,7 @@ private fun DoodleSettingsPanel(settings: AppSettings, onUpdate: (AppSettings) -
                         FilterChip(
                             selected = settings.defaultDoodleStyle == style,
                             onClick = { onUpdate(settings.copy(defaultDoodleStyle = style)) },
-                            label = { Text(label, fontSize = 10.sp) }
+                            label = { Text(label, fontSize = 11.sp) }
                         )
                     }
                 }
@@ -443,13 +579,16 @@ private fun ExportSettingsPanel(settings: AppSettings, onUpdate: (AppSettings) -
         }
 
         item {
-            SettingRow(title = "Default Export Format", subtitle = "Primary output option") {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            SettingStackedRow(
+                title = "Default Export Format",
+                subtitle = "Primary output option"
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf("MP4", "GIF", "ZIP").forEach { fmt ->
                         FilterChip(
                             selected = settings.defaultExportFormat == fmt,
                             onClick = { onUpdate(settings.copy(defaultExportFormat = fmt)) },
-                            label = { Text(fmt, fontSize = 10.sp) }
+                            label = { Text(fmt, fontSize = 11.sp) }
                         )
                     }
                 }
@@ -457,8 +596,11 @@ private fun ExportSettingsPanel(settings: AppSettings, onUpdate: (AppSettings) -
         }
 
         item {
-            SettingRow(title = "H.264 Video Quality (CRF)", subtitle = "Lower values yield higher visual quality") {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            SettingStackedRow(
+                title = "H.264 Video Quality (CRF)",
+                subtitle = "Lower values yield higher visual quality and larger file size"
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf(
                         18 to "High (CRF 18)",
                         23 to "Balanced (CRF 23)",
@@ -467,7 +609,7 @@ private fun ExportSettingsPanel(settings: AppSettings, onUpdate: (AppSettings) -
                         FilterChip(
                             selected = settings.exportQualityCrf == crf,
                             onClick = { onUpdate(settings.copy(exportQualityCrf = crf)) },
-                            label = { Text(label, fontSize = 10.sp) }
+                            label = { Text(label, fontSize = 11.sp) }
                         )
                     }
                 }
@@ -516,7 +658,7 @@ private fun SystemSettingsPanel(state: EditorState, onUpdate: (AppSettings) -> U
         }
 
         item {
-            SettingRow(
+            SettingInlineRow(
                 title = "Thumbnail Memory Cache",
                 subtitle = "Clear cached frame bitmaps from RAM"
             ) {
@@ -538,15 +680,29 @@ private fun SystemSettingsPanel(state: EditorState, onUpdate: (AppSettings) -> U
 }
 
 @Composable
-private fun SettingRow(title: String, subtitle: String, control: @Composable () -> Unit) {
+private fun SettingStackedRow(title: String, subtitle: String, control: @Composable () -> Unit) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Column {
+            Text(title, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = StudioTextPrimary)
+            Text(subtitle, fontSize = 11.sp, color = StudioTextSecondary)
+        }
+        control()
+    }
+}
+
+@Composable
+private fun SettingInlineRow(title: String, subtitle: String, control: @Composable () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.weight(1f)) {
+        Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
             Text(title, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = StudioTextPrimary)
-            Text(subtitle, fontSize = 10.sp, color = StudioTextSecondary)
+            Text(subtitle, fontSize = 11.sp, color = StudioTextSecondary)
         }
         control()
     }
@@ -559,9 +715,9 @@ private fun SettingSwitchRow(title: String, subtitle: String, checked: Boolean, 
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.weight(1f)) {
+        Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
             Text(title, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = StudioTextPrimary)
-            Text(subtitle, fontSize = 10.sp, color = StudioTextSecondary)
+            Text(subtitle, fontSize = 11.sp, color = StudioTextSecondary)
         }
         Switch(
             checked = checked,
@@ -583,7 +739,7 @@ private fun SettingSliderRow(
     steps: Int = 0,
     onValueChange: (Float) -> Unit
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
+    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,

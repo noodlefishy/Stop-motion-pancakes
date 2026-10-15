@@ -90,12 +90,6 @@ fun CameraCaptureDialog(state: EditorState) {
         refreshCameras()
     }
 
-    DisposableEffect(Unit) {
-        onDispose {
-            streamer.stop()
-        }
-    }
-
     fun triggerSnap() {
         if (isCapturing) return
         isCapturing = true
@@ -126,6 +120,16 @@ fun CameraCaptureDialog(state: EditorState) {
             delay(1000)
             countdownValue = null
             triggerSnap()
+        }
+    }
+
+    DisposableEffect(Unit) {
+        state.onCameraSnapRequested = {
+            triggerSnap()
+        }
+        onDispose {
+            streamer.stop()
+            state.onCameraSnapRequested = null
         }
     }
 
@@ -494,7 +498,7 @@ fun CameraCaptureDialog(state: EditorState) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Hint: Press Spacebar to snap without clicking",
+                        text = "Hint: Press Spacebar or Enter to snap frame",
                         fontSize = 11.sp,
                         color = StudioTextMuted
                     )

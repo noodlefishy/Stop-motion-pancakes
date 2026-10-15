@@ -87,16 +87,19 @@ fun FilmstripTimeline(state: EditorState, modifier: Modifier = Modifier) {
                 TimelineActionButton(
                     icon = Icons.Default.ArrowBack,
                     tooltip = "Move Left",
+                    shortcut = "Alt+Left",
                     onClick = { state.moveSelectedFrame(-1) }
                 )
                 TimelineActionButton(
                     icon = Icons.Default.ArrowForward,
                     tooltip = "Move Right",
+                    shortcut = "Alt+Right",
                     onClick = { state.moveSelectedFrame(1) }
                 )
                 TimelineActionButton(
                     icon = Icons.Default.ContentCopy,
                     tooltip = "Duplicate Frame",
+                    shortcut = "Cmd+D",
                     onClick = { state.duplicateSelectedFrame() }
                 )
                 TimelineActionButton(
@@ -107,6 +110,7 @@ fun FilmstripTimeline(state: EditorState, modifier: Modifier = Modifier) {
                 TimelineActionButton(
                     icon = Icons.Default.DeleteOutline,
                     tooltip = "Delete Frame(s)",
+                    shortcut = "Del",
                     onClick = { state.deleteSelectedFrames() }
                 )
 
@@ -368,12 +372,15 @@ private fun AudioWaveformRow(state: EditorState) {
 private fun TimelineActionButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     tooltip: String,
+    shortcut: String? = null,
     onClick: () -> Unit
 ) {
-    IconButton(
-        onClick = onClick,
-        modifier = Modifier.size(28.dp)
-    ) {
-        Icon(icon, tooltip, tint = StudioTextSecondary, modifier = Modifier.size(16.dp))
+    StudioTooltip(text = tooltip, shortcut = shortcut) {
+        IconButton(
+            onClick = onClick,
+            modifier = Modifier.size(28.dp)
+        ) {
+            Icon(icon, tooltip, tint = StudioTextSecondary, modifier = Modifier.size(16.dp))
+        }
     }
 }

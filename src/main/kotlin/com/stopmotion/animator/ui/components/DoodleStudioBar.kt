@@ -151,31 +151,37 @@ fun DoodleStudioBar(state: EditorState, modifier: Modifier = Modifier) {
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 // Copy Doodles to Next Frame (Key Stop-Motion Doodle feature)
-                Button(
-                    onClick = { state.copyDoodlesToNextFrame() },
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                    shape = RoundedCornerShape(6.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = StudioCard, contentColor = StudioPrimary)
-                ) {
-                    Icon(Icons.Default.ContentCopy, null, modifier = Modifier.size(14.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("Copy to Next", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                StudioTooltip("Copy Doodles to Next Frame", "Cmd+Shift+D") {
+                    Button(
+                        onClick = { state.copyDoodlesToNextFrame() },
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                        shape = RoundedCornerShape(6.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = StudioCard, contentColor = StudioPrimary)
+                    ) {
+                        Icon(Icons.Default.ContentCopy, null, modifier = Modifier.size(14.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Copy to Next", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
 
                 // Undo Last Doodle Stroke
-                IconButton(
-                    onClick = { state.undoLastDoodleStroke() },
-                    modifier = Modifier.size(28.dp)
-                ) {
-                    Icon(Icons.Default.Undo, "Undo Stroke", tint = StudioTextSecondary, modifier = Modifier.size(16.dp))
+                StudioTooltip("Undo Last Doodle Stroke") {
+                    IconButton(
+                        onClick = { state.undoLastDoodleStroke() },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(Icons.Default.Undo, "Undo Stroke", tint = StudioTextSecondary, modifier = Modifier.size(16.dp))
+                    }
                 }
 
                 // Clear Doodles
-                IconButton(
-                    onClick = { state.clearFrameDrawings() },
-                    modifier = Modifier.size(28.dp)
-                ) {
-                    Icon(Icons.Default.DeleteOutline, "Clear Frame Doodles", tint = StudioTextMuted, modifier = Modifier.size(16.dp))
+                StudioTooltip("Clear All Doodles on Frame") {
+                    IconButton(
+                        onClick = { state.clearFrameDrawings() },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(Icons.Default.DeleteOutline, "Clear Frame Doodles", tint = StudioTextMuted, modifier = Modifier.size(16.dp))
+                    }
                 }
             }
         }
@@ -190,44 +196,48 @@ private fun DoodleStyleButton(
     selectedColor: Color = StudioPrimary,
     onClick: () -> Unit
 ) {
-    Surface(
-        modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .clickable(onClick = onClick),
-        color = if (isSelected) selectedColor.copy(alpha = 0.25f) else Color.Transparent
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+    StudioTooltip(text = "$label Style") {
+        Surface(
+            modifier = Modifier
+                .clip(RoundedCornerShape(6.dp))
+                .clickable(onClick = onClick),
+            color = if (isSelected) selectedColor.copy(alpha = 0.25f) else Color.Transparent
         ) {
-            Icon(
-                icon,
-                null,
-                tint = if (isSelected) selectedColor else StudioTextSecondary,
-                modifier = Modifier.size(14.dp)
-            )
-            Text(
-                label,
-                fontSize = 11.sp,
-                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                color = if (isSelected) selectedColor else StudioTextSecondary
-            )
+            Row(
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Icon(
+                    icon,
+                    null,
+                    tint = if (isSelected) selectedColor else StudioTextSecondary,
+                    modifier = Modifier.size(14.dp)
+                )
+                Text(
+                    label,
+                    fontSize = 11.sp,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                    color = if (isSelected) selectedColor else StudioTextSecondary
+                )
+            }
         }
     }
 }
 
 @Composable
 private fun DoodleStampButton(label: String, tooltip: String, onClick: () -> Unit) {
-    Surface(
-        modifier = Modifier
-            .size(26.dp)
-            .clip(RoundedCornerShape(6.dp))
-            .clickable(onClick = onClick),
-        color = StudioCard
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Text(label, fontSize = 13.sp)
+    StudioTooltip(text = tooltip) {
+        Surface(
+            modifier = Modifier
+                .size(26.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .clickable(onClick = onClick),
+            color = StudioCard
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Text(label, fontSize = 13.sp)
+            }
         }
     }
 }

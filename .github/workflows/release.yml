@@ -32,7 +32,7 @@ jobs:
             artifact-pattern: |
               build/compose/binaries/main/msi/*.msi
               build/compose/jars/*.jar
-          - os: debian-latest
+          - os: ubuntu-latest
             os-name: Linux
             task: packageDeb packageUberJarForCurrentOS
             artifact-pattern: |

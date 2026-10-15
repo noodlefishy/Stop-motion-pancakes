@@ -17,6 +17,7 @@ class EditorState(val scope: CoroutineScope = CoroutineScope(Dispatchers.Default
     val audioEngine = AudioEngine()
 
     var project by mutableStateOf(AnimationProject())
+    var currentProjectFile by mutableStateOf<File?>(null)
 
     var currentTimelineIndex by mutableStateOf(0)
     var selectedFrameIndex by mutableStateOf(0)
@@ -562,6 +563,7 @@ class EditorState(val scope: CoroutineScope = CoroutineScope(Dispatchers.Default
         }
 
         clampIndices()
+        currentProjectFile = null
         showToast("Loaded demo project! Press Space to Play")
     }
 
@@ -570,10 +572,24 @@ class EditorState(val scope: CoroutineScope = CoroutineScope(Dispatchers.Default
             val json = Json { prettyPrint = true }
             val text = json.encodeToString(AnimationProject.serializer(), project)
             file.writeText(text)
+            currentProjectFile = file
+            project = project.copy(
+                title = file.nameWithoutExtension,
+                projectDirectory = file.parentFile?.absolutePath
+            )
             showToast("Saved project to ${file.name}")
         } catch (e: Exception) {
             e.printStackTrace()
             showToast("Error saving project: ${e.message}")
+        }
+    }
+
+    fun saveProjectPassively(onPromptSaveAs: () -> Unit) {
+        val file = currentProjectFile
+        if (file != null) {
+            saveProjectToJson(file)
+        } else {
+            onPromptSaveAs()
         }
     }
 
@@ -583,6 +599,7 @@ class EditorState(val scope: CoroutineScope = CoroutineScope(Dispatchers.Default
             val json = Json { ignoreUnknownKeys = true }
             val loaded = json.decodeFromString(AnimationProject.serializer(), text)
             project = loaded
+            currentProjectFile = file
             clampIndices()
             showToast("Opened project: ${loaded.title}")
         } catch (e: Exception) {

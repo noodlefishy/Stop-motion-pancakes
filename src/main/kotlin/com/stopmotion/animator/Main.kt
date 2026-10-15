@@ -40,8 +40,37 @@ fun main() = application {
         title = "Stop Motion Pancake — ${editorState.project.title}",
         state = windowState,
         onKeyEvent = { keyEvent ->
+            if (NativeFileDialogs.isNativeDialogVisible) {
+                return@Window false
+            }
             if (keyEvent.type == KeyEventType.KeyDown) {
                 when {
+                    // Cmd+S: Save Project Passively
+                    keyEvent.isMetaPressed && keyEvent.key == Key.S && !keyEvent.isShiftPressed -> {
+                        editorState.saveProjectPassively {
+                            val dir = editorState.project.projectDirectory ?: System.getProperty("user.home")
+                            val file = NativeFileDialogs.saveProject(
+                                defaultName = "${editorState.project.title}.smproj",
+                                defaultDirectory = dir
+                            )
+                            if (file != null) {
+                                editorState.saveProjectToJson(file)
+                            }
+                        }
+                        true
+                    }
+                    // Cmd+Shift+S: Save Project As...
+                    keyEvent.isMetaPressed && keyEvent.key == Key.S && keyEvent.isShiftPressed -> {
+                        val dir = editorState.project.projectDirectory ?: System.getProperty("user.home")
+                        val file = NativeFileDialogs.saveProject(
+                            defaultName = "${editorState.project.title}.smproj",
+                            defaultDirectory = dir
+                        )
+                        if (file != null) {
+                            editorState.saveProjectToJson(file)
+                        }
+                        true
+                    }
                     // Spacebar or Enter
                     keyEvent.key == Key.Spacebar || keyEvent.key == Key.Enter -> {
                         if (editorState.isCameraCaptureDialogVisible) {
@@ -150,6 +179,18 @@ fun main() = application {
                     }
                 }
                 Item("Save Project", shortcut = KeyShortcut(Key.S, meta = true)) {
+                    editorState.saveProjectPassively {
+                        val dir = editorState.project.projectDirectory ?: System.getProperty("user.home")
+                        val file = NativeFileDialogs.saveProject(
+                            defaultName = "${editorState.project.title}.smproj",
+                            defaultDirectory = dir
+                        )
+                        if (file != null) {
+                            editorState.saveProjectToJson(file)
+                        }
+                    }
+                }
+                Item("Save Project As...", shortcut = KeyShortcut(Key.S, meta = true, shift = true)) {
                     val dir = editorState.project.projectDirectory ?: System.getProperty("user.home")
                     val file = NativeFileDialogs.saveProject(
                         defaultName = "${editorState.project.title}.smproj",

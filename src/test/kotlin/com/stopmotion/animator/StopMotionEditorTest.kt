@@ -186,4 +186,35 @@ class StopMotionEditorTest {
         state.triggerCameraSnap()
         assertTrue("Camera snap callback should be called", snapTriggered)
     }
+
+    @Test
+    fun testPassiveProjectSave() {
+        val state = com.stopmotion.animator.state.EditorState()
+        val tempFile = File.createTempFile("pancake_test", ".smproj")
+        tempFile.deleteOnExit()
+
+        var promptCalled = false
+        // When unsaved (currentProjectFile == null), it should invoke the prompt callback
+        state.saveProjectPassively {
+            promptCalled = true
+        }
+        assertTrue("Should prompt for save when file is not set", promptCalled)
+
+        // Once saved to a file, passive save should directly write to file without prompting
+        state.saveProjectToJson(tempFile)
+        assertEquals(tempFile, state.currentProjectFile)
+
+        var promptedAgain = false
+        state.saveProjectPassively {
+            promptedAgain = true
+        }
+        assertFalse("Should passively save without prompting when file is already set", promptedAgain)
+        assertTrue(tempFile.exists())
+        assertTrue(tempFile.length() > 0)
+    }
+
+    @Test
+    fun testNativeFileDialogFlag() {
+        assertFalse("Dialog should default to not visible", com.stopmotion.animator.util.NativeFileDialogs.isNativeDialogVisible)
+    }
 }

@@ -132,6 +132,23 @@ fun TopBar(state: EditorState) {
                         leadingIcon = { Icon(Icons.Default.Save, null, modifier = Modifier.size(16.dp)) },
                         onClick = {
                             projectMenuOpen = false
+                            state.saveProjectPassively {
+                                val dir = state.project.projectDirectory ?: System.getProperty("user.home")
+                                val file = NativeFileDialogs.saveProject(
+                                    defaultName = "${state.project.title}.smproj",
+                                    defaultDirectory = dir
+                                )
+                                if (file != null) {
+                                    state.saveProjectToJson(file)
+                                }
+                            }
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Save Project As...") },
+                        leadingIcon = { Icon(Icons.Default.SaveAs, null, modifier = Modifier.size(16.dp)) },
+                        onClick = {
+                            projectMenuOpen = false
                             val dir = state.project.projectDirectory ?: System.getProperty("user.home")
                             val file = NativeFileDialogs.saveProject(
                                 defaultName = "${state.project.title}.smproj",

@@ -35,6 +35,17 @@ compose.desktop {
 
             macOS {
                 bundleID = "com.stopmotion.pancake"
+                infoPlist {
+                    extraKeysRawXml = """
+                        <key>NSCameraUsageDescription</key>
+                        <string>Stop Motion Pancake needs camera access to capture animation frames and live stream Continuity Camera.</string>
+                        <key>NSMicrophoneUsageDescription</key>
+                        <string>Stop Motion Pancake needs microphone access to record and sync audio.</string>
+                    """.trimIndent()
+                }
+
+                // 2. If signing the app or enabling Hardened Runtime:
+                entitlementsFile.set(project.file("src/main/resources/entitlements.plist"))
             }
             windows {
                 menuGroup = "Stop Motion Pancake"

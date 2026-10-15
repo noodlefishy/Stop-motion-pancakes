@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Allows the app and child processes (ffmpeg) to access cameras -->
+    <key>com.apple.security.device.camera</key>
+    <true/>
+    <!-- Allows microphone access -->
+    <key>com.apple.security.device.audio-input</key>
+    <true/>
+    <!-- Required if your app is sandboxed and executes bundled or external binaries -->
+    <key>com.apple.security.inherit</key>
+    <true/>
+</dict>
+</plist>

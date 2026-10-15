@@ -42,7 +42,7 @@ class CameraStreamer {
                 )
 
                 val proc = ProcessBuilder(cmd)
-                    .redirectError(ProcessBuilder.Redirect.DISCARD)
+                    .redirectErrorStream(true)
                     .start()
                 process = proc
 

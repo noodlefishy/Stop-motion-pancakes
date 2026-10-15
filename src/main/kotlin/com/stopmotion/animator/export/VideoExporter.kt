@@ -12,23 +12,11 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import javax.imageio.ImageIO
 
+import com.stopmotion.animator.util.PlatformUtils
+
 object VideoExporter {
 
-    private fun findFFmpeg(): String {
-        val candidates = listOf(
-            "/opt/homebrew/bin/ffmpeg",
-            "/usr/local/bin/ffmpeg",
-            "ffmpeg"
-        )
-        for (c in candidates) {
-            try {
-                val proc = ProcessBuilder(c, "-version").start()
-                if (proc.waitFor() == 0) return c
-            } catch (ignored: Exception) {
-            }
-        }
-        return "ffmpeg"
-    }
+    private fun findFFmpeg(): String = PlatformUtils.findFFmpeg()
 
     /**
      * Exports project frames into a temporary folder, expanding hold exposures.
@@ -140,7 +128,7 @@ object VideoExporter {
                 return@withContext Result.failure(Exception("No valid frames to export"))
             }
 
-            onProgress(0.6f, "Generating GIF palette and optimizing...")
+            onProgress(0.6f, "Generating GIF palette and optimising...")
             val ffmpeg = findFFmpeg()
             val inputPattern = File(tempDir, "frame_%05d.png").absolutePath
 

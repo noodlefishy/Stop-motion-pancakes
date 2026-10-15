@@ -1,5 +1,6 @@
 package com.stopmotion.animator.capture
 
+import com.stopmotion.animator.util.PlatformUtils
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import kotlinx.coroutines.*
@@ -24,13 +25,17 @@ class CameraStreamer {
         streamJob = scope.launch(Dispatchers.IO) {
             try {
                 isStreaming = true
+                val ffmpeg = PlatformUtils.findFFmpeg()
+                val format = PlatformUtils.getCameraFormat()
+                val inputTarget = PlatformUtils.getCameraInputTarget(deviceId)
+
                 val cmd = listOf(
-                    "/opt/homebrew/bin/ffmpeg",
+                    ffmpeg,
                     "-y",
-                    "-f", "avfoundation",
+                    "-f", format,
                     "-framerate", "30",
                     "-video_size", "640x480",
-                    "-i", "$deviceId:none",
+                    "-i", inputTarget,
                     "-f", "image2pipe",
                     "-vcodec", "mjpeg",
                     "-"

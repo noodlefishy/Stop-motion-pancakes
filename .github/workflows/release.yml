@@ -1,0 +1,91 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.os-name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            os-name: macOS
+            task: packageDmg
+            artifact-path: build/compose/binaries/main/dmg/*.dmg
+          - os: windows-latest
+            os-name: Windows
+            task: packageMsi
+            artifact-path: build/compose/binaries/main/msi/*.msi
+          - os: debian-latest
+            os-name: Linux
+            task: packageDeb
+            artifact-path: build/compose/binaries/main/deb/*.deb
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '21'
+          cache: 'gradle'
+
+      - name: Install Linux packaging tools
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fakeroot alien
+
+      - name: Grant execute permission for gradlew
+        if: runner.os != 'Windows'
+        run: chmod +x gradlew
+
+      - name: Build distribution package
+        run: ./gradlew ${{ matrix.task }} --no-daemon
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Stop-Motion-Pancake-${{ matrix.os-name }}
+          path: ${{ matrix.artifact-path }}
+          if-no-files-found: error
+
+  publish:
+    name: Publish Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all built packages
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+
+      - name: Flatten release assets
+        run: |
+          mkdir -p dist
+          find release-artifacts -type f \( -name "*.dmg" -o -name "*.msi" -o -name "*.deb" \) -exec cp {} dist/ \;
+          ls -la dist
+
+      - name: Create or update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          tag_name: ${{ github.ref_name || 'v1.0.0' }}
+          name: Stop Motion Pancake ${{ github.ref_name || 'v1.0.0' }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true

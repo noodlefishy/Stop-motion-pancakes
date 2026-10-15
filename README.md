@@ -11,14 +11,19 @@ run the app
 ./gradlew run
 ```
 
-build the mac app and dmg
+build installers for your current os
 ```bash
-./gradlew createDistributable packageDmg
+# mac (dmg)
+./gradlew packageDmg
+
+# windows (msi)
+./gradlew packageMsi
+
+# linux (deb)
+./gradlew packageDeb
 ```
 
-outputs end up in
-- `build/compose/binaries/main/app/Stop Motion Pancake.app`
-- `build/compose/binaries/main/dmg/Stop Motion Pancake-1.0.0.dmg`
+packages end up in `build/compose/binaries/main/`
 
 ## what it does
 

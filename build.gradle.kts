@@ -23,13 +23,26 @@ compose.desktop {
         nativeDistributions {
             targetFormats(
                 org.jetbrains.compose.desktop.application.dsl.TargetFormat.Dmg,
-                org.jetbrains.compose.desktop.application.dsl.TargetFormat.Pkg
+                org.jetbrains.compose.desktop.application.dsl.TargetFormat.Msi,
+                org.jetbrains.compose.desktop.application.dsl.TargetFormat.Exe,
+                org.jetbrains.compose.desktop.application.dsl.TargetFormat.Deb
             )
             packageName = "Stop Motion Pancake"
             packageVersion = "1.0.0"
             description = "Pretty pretty stop motion"
             copyright = "2026 Stop Motion Pancake"
             vendor = "Stop Motion Pancake"
+
+            macOS {
+                bundleID = "com.stopmotion.pancake"
+            }
+            windows {
+                menuGroup = "Stop Motion Pancake"
+                upgradeUuid = "a687f872-9852-4742-b912-1d54be5ce82a"
+            }
+            linux {
+                packageName = "stop-motion-pancake"
+            }
         }
     }
 }

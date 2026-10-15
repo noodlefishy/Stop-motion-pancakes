@@ -273,6 +273,7 @@ fun main() = application {
                 // Modal Dialogs
                 ExportDialog(editorState)
                 CameraCaptureDialog(editorState)
+                SettingsDialog(editorState)
             }
         }
     }

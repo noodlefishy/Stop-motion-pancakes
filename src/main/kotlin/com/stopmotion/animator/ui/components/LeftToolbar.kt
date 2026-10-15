@@ -79,21 +79,6 @@ fun LeftToolbar(state: EditorState) {
             }
         )
 
-        ToolIconButton(
-            icon = Icons.Default.Healing,
-            tooltip = "Rig Removal (Clean Plate inpaint)",
-            isSelected = state.activeTool == EditorTool.RIG_REMOVAL,
-            selectedColor = StudioAccent,
-            onClick = { state.activeTool = EditorTool.RIG_REMOVAL }
-        )
-
-        ToolIconButton(
-            icon = Icons.Default.Tune,
-            tooltip = "Color & Exposure / De-flicker",
-            isSelected = state.activeTool == EditorTool.COLOR_GRADE,
-            onClick = { state.activeTool = EditorTool.COLOR_GRADE }
-        )
-
         HorizontalDivider(
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
             color = StudioBorder

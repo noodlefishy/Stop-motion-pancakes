@@ -6,27 +6,31 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-val StudioDark = Color(0xFF141619)
-val StudioSurface = Color(0xFF1E2126)
-val StudioCard = Color(0xFF262A30)
-val StudioBorder = Color(0xFF333842)
-val StudioPrimary = Color(0xFFFF5E36) // Energetic stop-motion orange/amber
-val StudioPrimaryHover = Color(0xFFFF7A59)
-val StudioSecondary = Color(0xFF38BDF8) // Cyan accent
-val StudioAccent = Color(0xFF10B981) // Emerald / green for capture & success
-val StudioWarning = Color(0xFFF59E0B)
-val StudioTextPrimary = Color(0xFFF1F5F9)
+// Modern Pro Studio Color Palette (Obsidian & Electric Indigo)
+val StudioDark = Color(0xFF0D0F14)       // Deep obsidian canvas
+val StudioSurface = Color(0xFF151821)    // Refined deep slate panels
+val StudioCard = Color(0xFF1E2330)       // Elevated cards & controls
+val StudioBorder = Color(0xFF2A3142)     // Crisp subtle borders
+
+val StudioPrimary = Color(0xFF6366F1)    // Modern Electric Indigo / Violet
+val StudioPrimaryHover = Color(0xFF818CF8)
+val StudioSecondary = Color(0xFF06B6D4)  // Electric Cyan
+val StudioAccent = Color(0xFF10B981)     // Crisp Emerald for capture & success
+val StudioWarning = Color(0xFFF59E0B)    // Warm Amber
+val StudioError = Color(0xFFEF4444)      // Rose Red
+
+val StudioTextPrimary = Color(0xFFF8FAFC)
 val StudioTextSecondary = Color(0xFF94A3B8)
 val StudioTextMuted = Color(0xFF64748B)
 
-val OnionSkinPastColor = Color(0xFFFF3366) // Neon red/pink for past frames
-val OnionSkinFutureColor = Color(0xFF00E676) // Neon green for future frames
+val OnionSkinPastColor = Color(0xFFF43F5E)   // Neon Rose for past frames
+val OnionSkinFutureColor = Color(0xFF10B981) // Neon Mint for future frames
 
 val StudioColorScheme: ColorScheme = darkColorScheme(
     primary = StudioPrimary,
     onPrimary = Color.White,
-    primaryContainer = Color(0xFF4D1C10),
-    onPrimaryContainer = Color(0xFFFFDBCF),
+    primaryContainer = Color(0xFF2E335B),
+    onPrimaryContainer = Color(0xFFE0E7FF),
     secondary = StudioSecondary,
     onSecondary = Color.Black,
     surface = StudioSurface,
@@ -36,7 +40,7 @@ val StudioColorScheme: ColorScheme = darkColorScheme(
     surfaceVariant = StudioCard,
     onSurfaceVariant = StudioTextSecondary,
     outline = StudioBorder,
-    error = Color(0xFFEF4444),
+    error = StudioError,
     onError = Color.White
 )
 

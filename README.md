@@ -1,4 +1,4 @@
-# stop motion studio
+# stop motion pancake
 
 a desktop app for making stop motion animations with doodle rotoscoping, continuity camera support and timeline tools
 
@@ -15,8 +15,8 @@ build the mac app and dmg
 ```
 
 outputs end up in
-- `build/compose/binaries/main/app/StopMotionAnimator.app`
-- `build/compose/binaries/main/dmg/StopMotionAnimator-1.0.0.dmg`
+- `build/compose/binaries/main/app/StopMotionPancake.app`
+- `build/compose/binaries/main/dmg/StopMotionPancake-1.0.0.dmg`
 
 ## what it does
 

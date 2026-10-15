@@ -38,7 +38,7 @@ fun main() = application {
             editorState.audioEngine.release()
             exitApplication()
         },
-        title = "Stop Motion Studio — ${editorState.project.title}",
+        title = "Stop Motion Pancake — ${editorState.project.title}",
         state = windowState,
         onKeyEvent = { keyEvent ->
             if (keyEvent.type == KeyEventType.KeyDown) {
@@ -137,7 +137,7 @@ fun main() = application {
                 }
                 Item("Open Project...", shortcut = KeyShortcut(Key.O, meta = true)) {
                     val chooser = JFileChooser()
-                    chooser.fileFilter = FileNameExtensionFilter("Stop Motion Project (*.smproj)", "smproj", "json")
+                    chooser.fileFilter = FileNameExtensionFilter("Stop Motion Pancake Project (*.smproj)", "smproj", "json")
                     if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
                         editorState.loadProjectFromJson(chooser.selectedFile)
                     }

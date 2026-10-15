@@ -162,7 +162,7 @@ fun CameraCaptureDialog(state: EditorState) {
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Icon(Icons.Default.Videocam, null, tint = StudioAccent, modifier = Modifier.size(22.dp))
-                        Text("Stop Motion Camera Studio", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = StudioTextPrimary)
+                        Text("Stop Motion Pancake — Camera Studio", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = StudioTextPrimary)
                     }
 
                     IconButton(

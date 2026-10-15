@@ -50,7 +50,7 @@ fun TopBar(state: EditorState) {
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    Icons.Default.MovieFilter,
+                    Icons.Default.Layers,
                     contentDescription = "Logo",
                     tint = Color.White,
                     modifier = Modifier.size(22.dp)
@@ -59,7 +59,7 @@ fun TopBar(state: EditorState) {
 
             Column {
                 Text(
-                    text = "STOP MOTION STUDIO",
+                    text = "STOP MOTION PANCAKE",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     color = StudioPrimary,

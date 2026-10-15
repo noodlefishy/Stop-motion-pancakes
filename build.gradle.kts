@@ -25,11 +25,11 @@ compose.desktop {
                 org.jetbrains.compose.desktop.application.dsl.TargetFormat.Dmg,
                 org.jetbrains.compose.desktop.application.dsl.TargetFormat.Pkg
             )
-            packageName = "StopMotionAnimator"
+            packageName = "Stop Motion Pancake"
             packageVersion = "1.0.0"
-            description = "Professional Stop Motion Video Editor"
-            copyright = "© 2026 Stop Motion Animator"
-            vendor = "Stop Motion Studio"
+            description = "Pretty pretty stop motion"
+            copyright = "2026 Stop Motion Pancake"
+            vendor = "Stop Motion Pancake"
         }
     }
 }

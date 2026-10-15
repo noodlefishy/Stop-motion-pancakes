@@ -1,4 +1,4 @@
-rootProject.name = "stop-motion-animator"
+rootProject.name = "stop-motion-pancake"
 
 pluginManagement {
     repositories {

@@ -36,6 +36,7 @@ data class AppSettings(
     val defaultExportFormat: String = "MP4",
     val autoSaveMinutes: Int = 5,
     val maxCacheFrames: Int = 60,
+    val lastOpenedProjectPath: String? = null,
 
     // 6. Appearance & Themes
     val themePreset: AppThemePreset = AppThemePreset.OBSIDIAN_INDIGO

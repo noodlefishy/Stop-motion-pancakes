@@ -217,4 +217,28 @@ class StopMotionEditorTest {
     fun testNativeFileDialogFlag() {
         assertFalse("Dialog should default to not visible", com.stopmotion.animator.util.NativeFileDialogs.isNativeDialogVisible)
     }
+
+    @Test
+    fun testLastOpenedProjectPersistence() {
+        val state = com.stopmotion.animator.state.EditorState()
+        val tempFile = File.createTempFile("pancake_last_opened", ".smproj")
+        tempFile.deleteOnExit()
+
+        state.project = com.stopmotion.animator.model.AnimationProject(title = "Custom User Project")
+        state.saveProjectToJson(tempFile)
+
+        assertEquals(tempFile.absolutePath, state.settings.lastOpenedProjectPath)
+
+        // Verify loaded from SettingsManager
+        val savedSettings = com.stopmotion.animator.util.SettingsManager.loadSettings()
+        assertEquals(tempFile.absolutePath, savedSettings.lastOpenedProjectPath)
+
+        // Verify loadProjectFromJson also records last opened project
+        val anotherTemp = File.createTempFile("pancake_another", ".smproj")
+        anotherTemp.deleteOnExit()
+        anotherTemp.writeText(tempFile.readText())
+
+        state.loadProjectFromJson(anotherTemp)
+        assertEquals(anotherTemp.absolutePath, state.settings.lastOpenedProjectPath)
+    }
 }

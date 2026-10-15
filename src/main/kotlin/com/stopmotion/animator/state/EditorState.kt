@@ -86,9 +86,19 @@ class EditorState(val scope: CoroutineScope = CoroutineScope(Dispatchers.Default
         get() = project.frames.getOrNull(selectedFrameIndex)
 
     init {
-        // Automatically load demo on startup if project is empty
+        // Automatically load last opened project on startup, or fallback to demo
         scope.launch {
-            loadDemo()
+            val lastPath = settings.lastOpenedProjectPath
+            val lastFile = if (!lastPath.isNullOrBlank()) File(lastPath) else null
+            if (lastFile != null && lastFile.exists() && lastFile.isFile) {
+                try {
+                    loadProjectFromJson(lastFile)
+                } catch (e: Exception) {
+                    loadDemo()
+                }
+            } else {
+                loadDemo()
+            }
         }
     }
 
@@ -577,6 +587,7 @@ class EditorState(val scope: CoroutineScope = CoroutineScope(Dispatchers.Default
                 title = file.nameWithoutExtension,
                 projectDirectory = file.parentFile?.absolutePath
             )
+            recordLastOpenedProject(file)
             showToast("Saved project to ${file.name}")
         } catch (e: Exception) {
             e.printStackTrace()
@@ -600,11 +611,31 @@ class EditorState(val scope: CoroutineScope = CoroutineScope(Dispatchers.Default
             val loaded = json.decodeFromString(AnimationProject.serializer(), text)
             project = loaded
             currentProjectFile = file
+            // Re-cache audio tracks if any exist
+            for (track in loaded.audioTracks) {
+                val af = File(track.filePath)
+                if (af.exists()) {
+                    audioEngine.loadAudioTrack(af, loaded.fps)
+                }
+            }
             clampIndices()
+            recordLastOpenedProject(file)
             showToast("Opened project: ${loaded.title}")
         } catch (e: Exception) {
             e.printStackTrace()
             showToast("Error opening project: ${e.message}")
+        }
+    }
+
+    private fun recordLastOpenedProject(file: File) {
+        try {
+            if (file.exists()) {
+                val updated = settings.copy(lastOpenedProjectPath = file.absolutePath)
+                settings = updated
+                com.stopmotion.animator.util.SettingsManager.saveSettings(updated)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 

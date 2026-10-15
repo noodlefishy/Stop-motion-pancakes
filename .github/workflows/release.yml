@@ -13,22 +13,31 @@ jobs:
   build:
     name: Build ${{ matrix.os-name }}
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: macos-latest
             os-name: macOS
-            task: packageDmg
-            artifact-path: build/compose/binaries/main/dmg/*.dmg
+            task: packageDmg packageUberJarForCurrentOS
+            artifact-pattern: |
+              build/compose/binaries/main/dmg/*.dmg
+              build/compose/jars/*.jar
           - os: windows-latest
             os-name: Windows
-            task: packageMsi
-            artifact-path: build/compose/binaries/main/msi/*.msi
+            task: packageMsi packageUberJarForCurrentOS
+            artifact-pattern: |
+              build/compose/binaries/main/msi/*.msi
+              build/compose/jars/*.jar
           - os: debian-latest
             os-name: Linux
-            task: packageDeb
-            artifact-path: build/compose/binaries/main/deb/*.deb
+            task: packageDeb packageUberJarForCurrentOS
+            artifact-pattern: |
+              build/compose/binaries/main/deb/*.deb
+              build/compose/jars/*.jar
 
     steps:
       - name: Checkout repository
@@ -51,14 +60,14 @@ jobs:
         if: runner.os != 'Windows'
         run: chmod +x gradlew
 
-      - name: Build distribution package
+      - name: Build distribution package and JAR
         run: ./gradlew ${{ matrix.task }} --no-daemon
 
-      - name: Upload artifact
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: Stop-Motion-Pancake-${{ matrix.os-name }}
-          path: ${{ matrix.artifact-path }}
+          path: ${{ matrix.artifact-pattern }}
           if-no-files-found: error
 
   publish:
@@ -77,7 +86,7 @@ jobs:
       - name: Flatten release assets
         run: |
           mkdir -p dist
-          find release-artifacts -type f \( -name "*.dmg" -o -name "*.msi" -o -name "*.deb" \) -exec cp {} dist/ \;
+          find release-artifacts -type f \( -name "*.dmg" -o -name "*.msi" -o -name "*.deb" -o -name "*.jar" \) -exec cp {} dist/ \;
           ls -la dist
 
       - name: Create or update GitHub Release

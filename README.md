@@ -21,9 +21,13 @@ build installers for your current os
 
 # linux (deb)
 ./gradlew packageDeb
+
+# single runnable fat jar
+./gradlew packageUberJarForCurrentOS
 ```
 
-packages end up in `build/compose/binaries/main/`
+installers end up in `build/compose/binaries/main/`
+fat jar ends up in `build/compose/jars/`
 
 ## what it does
 

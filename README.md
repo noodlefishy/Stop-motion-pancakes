@@ -2,6 +2,8 @@
 
 a desktop app for making stop motion animations with doodle rotoscoping, continuity camera support and timeline tools
 
+![stop motion pancake](assets/screenshot.png)
+
 ## quick start
 
 run the app

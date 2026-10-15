@@ -19,9 +19,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.stopmotion.animator.state.EditorState
 import com.stopmotion.animator.ui.theme.*
+import com.stopmotion.animator.util.NativeFileDialogs
 import java.io.File
-import javax.swing.JFileChooser
-import javax.swing.filechooser.FileNameExtensionFilter
 
 @Composable
 fun ExportDialog(state: EditorState) {
@@ -122,11 +121,18 @@ fun ExportDialog(state: EditorState) {
                         )
                         Button(
                             onClick = {
-                                val chooser = JFileChooser()
-                                chooser.selectedFile = File(outputPath)
-                                chooser.dialogTitle = "Select Export Destination"
-                                if (chooser.showSaveDialog(null) == JFileChooser.APPROVE_OPTION) {
-                                    outputPath = chooser.selectedFile.absolutePath
+                                val extension = when (selectedFormat) {
+                                    "GIF" -> "gif"
+                                    "ZIP" -> "zip"
+                                    else -> "mp4"
+                                }
+                                val defaultFile = File(outputPath)
+                                val chosen = NativeFileDialogs.saveExport(
+                                    defaultName = defaultFile.name,
+                                    extension = extension
+                                )
+                                if (chosen != null) {
+                                    outputPath = chosen.absolutePath
                                 }
                             },
                             enabled = !state.isExporting,

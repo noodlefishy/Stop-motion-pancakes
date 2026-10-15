@@ -12,9 +12,6 @@ import com.stopmotion.animator.util.ImageProcessor
 import kotlinx.coroutines.*
 import kotlinx.serialization.json.Json
 import java.io.File
-import javax.swing.JFileChooser
-import javax.swing.filechooser.FileNameExtensionFilter
-
 class EditorState(val scope: CoroutineScope = CoroutineScope(Dispatchers.Default)) {
 
     val audioEngine = AudioEngine()

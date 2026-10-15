@@ -15,8 +15,8 @@ build the mac app and dmg
 ```
 
 outputs end up in
-- `build/compose/binaries/main/app/StopMotionPancake.app`
-- `build/compose/binaries/main/dmg/StopMotionPancake-1.0.0.dmg`
+- `build/compose/binaries/main/app/Stop Motion Pancake.app`
+- `build/compose/binaries/main/dmg/Stop Motion Pancake-1.0.0.dmg`
 
 ## what it does
 

@@ -19,10 +19,9 @@ import com.stopmotion.animator.model.EditorTool
 import com.stopmotion.animator.state.EditorState
 import com.stopmotion.animator.ui.components.*
 import com.stopmotion.animator.ui.theme.*
+import com.stopmotion.animator.util.NativeFileDialogs
 import kotlinx.coroutines.launch
 import java.io.File
-import javax.swing.JFileChooser
-import javax.swing.filechooser.FileNameExtensionFilter
 
 fun main() = application {
     val windowState = rememberWindowState(
@@ -133,20 +132,31 @@ fun main() = application {
         MenuBar {
             Menu("File", mnemonic = 'F') {
                 Item("New Project", shortcut = KeyShortcut(Key.N, meta = true)) {
-                    editorState.project = com.stopmotion.animator.model.AnimationProject()
+                    val target = NativeFileDialogs.chooseNewProjectLocation()
+                    if (target != null) {
+                        val title = target.nameWithoutExtension.ifBlank { "Untitled" }
+                        editorState.project = com.stopmotion.animator.model.AnimationProject(
+                            title = title,
+                            projectDirectory = target.parentFile?.absolutePath
+                        )
+                        editorState.saveProjectToJson(target)
+                        editorState.showToast("Created project: $title")
+                    }
                 }
                 Item("Open Project...", shortcut = KeyShortcut(Key.O, meta = true)) {
-                    val chooser = JFileChooser()
-                    chooser.fileFilter = FileNameExtensionFilter("Stop Motion Pancake Project (*.smproj)", "smproj", "json")
-                    if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
-                        editorState.loadProjectFromJson(chooser.selectedFile)
+                    val file = NativeFileDialogs.openProject()
+                    if (file != null) {
+                        editorState.loadProjectFromJson(file)
                     }
                 }
                 Item("Save Project", shortcut = KeyShortcut(Key.S, meta = true)) {
-                    val chooser = JFileChooser()
-                    chooser.selectedFile = File(System.getProperty("user.home"), "animation.smproj")
-                    if (chooser.showSaveDialog(null) == JFileChooser.APPROVE_OPTION) {
-                        editorState.saveProjectToJson(chooser.selectedFile)
+                    val dir = editorState.project.projectDirectory ?: System.getProperty("user.home")
+                    val file = NativeFileDialogs.saveProject(
+                        defaultName = "${editorState.project.title}.smproj",
+                        defaultDirectory = dir
+                    )
+                    if (file != null) {
+                        editorState.saveProjectToJson(file)
                     }
                 }
                 Separator()
@@ -154,11 +164,9 @@ fun main() = application {
                     coroutineScope.launch { editorState.loadDemo() }
                 }
                 Item("Import Frames...", shortcut = KeyShortcut(Key.I, meta = true)) {
-                    val chooser = JFileChooser()
-                    chooser.isMultiSelectionEnabled = true
-                    chooser.fileFilter = FileNameExtensionFilter("Images", "png", "jpg", "jpeg", "webp")
-                    if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
-                        editorState.addImportedImages(chooser.selectedFiles.toList())
+                    val files = NativeFileDialogs.openImages()
+                    if (files.isNotEmpty()) {
+                        editorState.addImportedImages(files)
                     }
                 }
                 Separator()

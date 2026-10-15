@@ -18,13 +18,12 @@ import androidx.compose.ui.unit.sp
 import com.stopmotion.animator.model.AspectRatio
 import com.stopmotion.animator.state.EditorState
 import com.stopmotion.animator.ui.theme.*
+import com.stopmotion.animator.util.NativeFileDialogs
 import kotlinx.coroutines.launch
-import java.io.File
-import javax.swing.JFileChooser
-import javax.swing.filechooser.FileNameExtensionFilter
 
 @Composable
 fun TopBar(state: EditorState) {
+    var projectMenuOpen by remember { mutableStateOf(false) }
     var fpsDropdownOpen by remember { mutableStateOf(false) }
     var aspectDropdownOpen by remember { mutableStateOf(false) }
 
@@ -37,7 +36,7 @@ fun TopBar(state: EditorState) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        // Left: App Logo & Project Title
+        // Left: App Logo & Project Dropdown Menu
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -57,20 +56,102 @@ fun TopBar(state: EditorState) {
                 )
             }
 
-            Column {
-                Text(
-                    text = "STOP MOTION PANCAKE",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = StudioPrimary,
-                    letterSpacing = 1.2.sp
-                )
-                Text(
-                    text = state.project.title,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = StudioTextPrimary
-                )
+            Box {
+                StudioTooltip("Project Menu & Sample Animations") {
+                    Surface(
+                        color = Color.Transparent,
+                        shape = RoundedCornerShape(6.dp),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .clickable { projectMenuOpen = true }
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                        ) {
+                            Column {
+                                Text(
+                                    text = "STOP MOTION PANCAKE",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = StudioPrimary,
+                                    letterSpacing = 1.2.sp
+                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                ) {
+                                    Text(
+                                        text = state.project.title,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = StudioTextPrimary
+                                    )
+                                    Icon(Icons.Default.ArrowDropDown, null, tint = StudioTextSecondary, modifier = Modifier.size(16.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+
+                DropdownMenu(
+                    expanded = projectMenuOpen,
+                    onDismissRequest = { projectMenuOpen = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("New Project...") },
+                        leadingIcon = { Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp)) },
+                        onClick = {
+                            projectMenuOpen = false
+                            val target = NativeFileDialogs.chooseNewProjectLocation()
+                            if (target != null) {
+                                val title = target.nameWithoutExtension.ifBlank { "Untitled" }
+                                state.project = com.stopmotion.animator.model.AnimationProject(
+                                    title = title,
+                                    projectDirectory = target.parentFile?.absolutePath
+                                )
+                                state.saveProjectToJson(target)
+                                state.showToast("Created project: $title")
+                            }
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Open Project...") },
+                        leadingIcon = { Icon(Icons.Default.FolderOpen, null, modifier = Modifier.size(16.dp)) },
+                        onClick = {
+                            projectMenuOpen = false
+                            val file = NativeFileDialogs.openProject()
+                            if (file != null) {
+                                state.loadProjectFromJson(file)
+                            }
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Save Project") },
+                        leadingIcon = { Icon(Icons.Default.Save, null, modifier = Modifier.size(16.dp)) },
+                        onClick = {
+                            projectMenuOpen = false
+                            val dir = state.project.projectDirectory ?: System.getProperty("user.home")
+                            val file = NativeFileDialogs.saveProject(
+                                defaultName = "${state.project.title}.smproj",
+                                defaultDirectory = dir
+                            )
+                            if (file != null) {
+                                state.saveProjectToJson(file)
+                            }
+                        }
+                    )
+                    HorizontalDivider(color = StudioBorder)
+                    DropdownMenuItem(
+                        text = { Text("Load Sample Demo Project") },
+                        leadingIcon = { Icon(Icons.Default.AutoAwesome, null, tint = StudioWarning, modifier = Modifier.size(16.dp)) },
+                        onClick = {
+                            projectMenuOpen = false
+                            state.scope.launch { state.loadDemo() }
+                        }
+                    )
+                }
             }
 
             Spacer(Modifier.width(8.dp))
@@ -182,37 +263,18 @@ fun TopBar(state: EditorState) {
             }
         }
 
-        // Right: Import & Export Action Buttons
+        // Right: Import & Export Action Buttons (Demo button removed from front)
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Load Demo Animation
-            StudioTooltip("Load Sample Animation") {
-                OutlinedButton(
-                    onClick = {
-                        state.scope.launch { state.loadDemo() }
-                    },
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                    shape = RoundedCornerShape(6.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = StudioTextSecondary)
-                ) {
-                    Icon(Icons.Default.AutoAwesome, null, modifier = Modifier.size(16.dp), tint = StudioWarning)
-                    Spacer(Modifier.width(6.dp))
-                    Text("Demo", fontSize = 12.sp)
-                }
-            }
-
-            // Import Images / Frames
+            // Import Images / Frames using Native macOS Finder
             StudioTooltip("Import Still Frames", "Cmd+I") {
                 Button(
                     onClick = {
-                        val chooser = JFileChooser()
-                        chooser.isMultiSelectionEnabled = true
-                        chooser.dialogTitle = "Import Frame Images"
-                        chooser.fileFilter = FileNameExtensionFilter("Image Files (PNG, JPG, JPEG, WebP)", "png", "jpg", "jpeg", "webp")
-                        if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
-                            state.addImportedImages(chooser.selectedFiles.toList())
+                        val files = NativeFileDialogs.openImages()
+                        if (files.isNotEmpty()) {
+                            state.addImportedImages(files)
                         }
                     },
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
@@ -225,15 +287,13 @@ fun TopBar(state: EditorState) {
                 }
             }
 
-            // Import Audio
+            // Import Audio using Native macOS Finder
             StudioTooltip("Import Soundtrack / Audio", "WAV/AIFF") {
                 Button(
                     onClick = {
-                        val chooser = JFileChooser()
-                        chooser.dialogTitle = "Import Audio Track (WAV, AIFF)"
-                        chooser.fileFilter = FileNameExtensionFilter("Audio Files (WAV, AIFF)", "wav", "aiff", "aif")
-                        if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
-                            state.importAudioFile(chooser.selectedFile)
+                        val file = NativeFileDialogs.openAudio()
+                        if (file != null) {
+                            state.importAudioFile(file)
                         }
                     },
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),

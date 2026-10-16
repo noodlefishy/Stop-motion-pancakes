@@ -83,6 +83,19 @@ class EditorState(
     var zoomScale by mutableStateOf(1.0f)
     var panOffsetX by mutableStateOf(0f)
     var panOffsetY by mutableStateOf(0f)
+    var isSpaceHeld by mutableStateOf(false)
+    var wasPanDragTriggered by mutableStateOf(false)
+
+    fun panBy(dx: Float, dy: Float) {
+        panOffsetX += dx
+        panOffsetY += dy
+    }
+
+    fun getEffectiveProjectsDirectory(): File {
+        val dir = File(settings.defaultProjectsPath)
+        dir.mkdirs()
+        return dir
+    }
     
     
     val currentFrame: FrameItem?
@@ -184,8 +197,8 @@ class EditorState(
         val ey = py - projY
         return kotlin.math.sqrt(ex * ex + ey * ey)
     }
-    
-        fun zoomIn() {
+        
+    fun zoomIn() {
         zoomScale = (zoomScale * 1.25f).coerceAtMost(5.0f)
     }
 

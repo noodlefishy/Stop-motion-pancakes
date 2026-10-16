@@ -11,6 +11,34 @@ import java.io.File
 
 class StopMotionEditorTest {
     @Test
+    fun testDefaultProjectsPathConfiguration() {
+        val state = com.stopmotion.animator.state.EditorState(skipInit = true)
+        assertNotNull(state.settings.defaultProjectsPath)
+        assertTrue(state.settings.defaultProjectsPath.endsWith("Stop Motion"))
+
+        val customDir = File(System.getProperty("java.io.tmpdir"), "Stop Motion Magic")
+        state.updateSettings(state.settings.copy(defaultProjectsPath = customDir.absolutePath))
+
+        assertEquals(customDir.absolutePath, state.settings.defaultProjectsPath)
+        val loaded = com.stopmotion.animator.util.SettingsManager.loadSettings()
+        assertEquals(customDir.absolutePath, loaded.defaultProjectsPath)
+    }
+
+    @Test
+    fun testPanViewportOffset() {
+        val state = com.stopmotion.animator.state.EditorState(skipInit = true)
+        assertEquals(0f, state.panOffsetX, 0.001f)
+        assertEquals(0f, state.panOffsetY, 0.001f)
+
+        state.panBy(45f, -30f)
+        assertEquals(45f, state.panOffsetX, 0.001f)
+        assertEquals(-30f, state.panOffsetY, 0.001f)
+
+        state.resetZoom()
+        assertEquals(0f, state.panOffsetX, 0.001f)
+        assertEquals(0f, state.panOffsetY, 0.001f)
+    }
+    @Test
     fun testStrokeEraserLogic() {
         val stroke1 = DrawingStroke(
             points = listOf(DrawingPoint(0.1f, 0.1f), DrawingPoint(0.2f, 0.2f)),

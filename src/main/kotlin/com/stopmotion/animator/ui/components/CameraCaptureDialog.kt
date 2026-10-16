@@ -87,11 +87,16 @@ fun CameraCaptureDialog(state: EditorState) {
     fun triggerSnap() {
         if (isCapturing) return
         isCapturing = true
-        val captureDir = File(System.getProperty("user.home"), ".stopmotion_animator/captures")
+
+        val captureDir = if (!state.project.projectDirectory.isNullOrBlank()) {
+            File(state.project.projectDirectory, "captures")
+        } else {
+            File(state.settings.defaultProjectsPath, "captures")
+        }
         captureDir.mkdirs()
+
         val destFile = File(captureDir, "capture_${System.currentTimeMillis()}.png")
-        
-        // interruption, no Continuity Camera reconnection.
+
         streamer.snapCurrentFrame(destFile, coroutineScope) { success ->
             isCapturing = false
             if (success) {

@@ -57,8 +57,8 @@ object NativeFileDialogs {
         }
     }
 
-    fun chooseNewProjectLocation(parent: Frame? = null): File? {
-        return saveProject(defaultName = "Untitled.smproj", parent = parent)
+    fun chooseNewProjectLocation(parent: Frame? = null,defaultDirectory:String? = null): File? {
+        return saveProject(defaultName = "Untitled.smproj", parent = parent, defaultDirectory = defaultDirectory)
     }
 
     fun openImages(parent: Frame? = null): List<File> {
@@ -96,6 +96,43 @@ object NativeFileDialogs {
             val dir = dialog.directory ?: return null
             return File(dir, file)
         } finally {
+            isNativeDialogVisible = false
+        }
+    }
+    
+    fun chooseDirectory(
+        title: String = "Select Stop Motion Projects Folder",
+        defaultDirectory: String? = null,
+        parent: Frame? = null
+    ): File? {
+        try {
+            isNativeDialogVisible = true
+            if (PlatformUtils.isMac) {
+                System.setProperty("apple.awt.fileDialogForDirectories", "true")
+                val dialog = FileDialog(parent, title, FileDialog.LOAD).apply {
+                    if (defaultDirectory != null) directory = defaultDirectory
+                    isVisible = true
+                }
+                val f = dialog.file ?: return null
+                val d = dialog.directory ?: return null
+                val file = File(d, f)
+                return if (file.isDirectory) file else file.parentFile
+            } else {
+                val chooser = javax.swing.JFileChooser().apply {
+                    dialogTitle = title
+                    fileSelectionMode = javax.swing.JFileChooser.DIRECTORIES_ONLY
+                    if (defaultDirectory != null) currentDirectory = File(defaultDirectory)
+                }
+                val res = chooser.showOpenDialog(parent)
+                return if (res == javax.swing.JFileChooser.APPROVE_OPTION) chooser.selectedFile else null
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return null
+        } finally {
+            if (PlatformUtils.isMac) {
+                System.setProperty("apple.awt.fileDialogForDirectories", "false")
+            }
             isNativeDialogVisible = false
         }
     }

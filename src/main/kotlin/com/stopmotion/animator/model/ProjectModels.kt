@@ -23,6 +23,7 @@ enum class OnionTintMode {
 @Serializable
 enum class EditorTool {
     SELECT,
+    HAND,
     DRAW_PEN,
     DRAW_GLOW,
     DRAW_CHALK,

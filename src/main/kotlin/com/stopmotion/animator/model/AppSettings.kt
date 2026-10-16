@@ -32,12 +32,12 @@ data class AppSettings(
     val defaultBrushColorHex: String = "#FFFF5E36",
 
     // 5. Export & Storage
-    val exportQualityCrf: Int = 18, // 18 = High cinematic quality, 23 = Standard
+    val exportQualityCrf: Int = 18,
     val defaultExportFormat: String = "MP4",
     val autoSaveMinutes: Int = 5,
     val maxCacheFrames: Int = 60,
     val lastOpenedProjectPath: String? = null,
-
+    val defaultProjectsPath: String = java.io.File(System.getProperty("user.home"), "Documents/Stop Motion").absolutePath,
     // 6. Appearance & Themes
     val themePreset: AppThemePreset = AppThemePreset.OBSIDIAN_INDIGO
 )

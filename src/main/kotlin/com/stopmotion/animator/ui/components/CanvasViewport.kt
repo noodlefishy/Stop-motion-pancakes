@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
@@ -21,8 +22,7 @@ import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
-import androidx.compose.ui.input.pointer.PointerType
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.*
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
@@ -43,7 +43,6 @@ fun CanvasViewport(state: EditorState, modifier: Modifier = Modifier) {
             .background(StudioDark),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Stage Canvas
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -53,7 +52,6 @@ fun CanvasViewport(state: EditorState, modifier: Modifier = Modifier) {
         ) {
             StopMotionCanvas(state)
 
-            // Floating Doodle Studio Bar when in drawing/eraser mode
             if (state.activeTool in listOf(
                     EditorTool.DRAW_PEN,
                     EditorTool.DRAW_GLOW,
@@ -70,7 +68,6 @@ fun CanvasViewport(state: EditorState, modifier: Modifier = Modifier) {
                 )
             }
 
-            // Floating Zoom & Pan HUD
             ZoomControlsHUD(
                 state = state,
                 modifier = Modifier
@@ -79,11 +76,11 @@ fun CanvasViewport(state: EditorState, modifier: Modifier = Modifier) {
             )
         }
 
-        // Playback Transport Bar
         PlaybackTransportBar(state)
     }
 }
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun StopMotionCanvas(state: EditorState) {
     var activePoints by remember { mutableStateOf(listOf<DrawingPoint>()) }
@@ -117,7 +114,6 @@ fun StopMotionCanvas(state: EditorState) {
             }
         }
 
-        // Helper to convert screen pointer Offset back to normalized [0f..1f] coords
         fun screenToNorm(screenPos: Offset, w: Float, h: Float): DrawingPoint {
             val cx = w / 2f
             val cy = h / 2f
@@ -126,9 +122,27 @@ fun StopMotionCanvas(state: EditorState) {
             return DrawingPoint(normX, normY)
         }
 
+        val isPanningActive = state.isSpaceHeld || state.activeTool == EditorTool.HAND
+
         Canvas(
             modifier = Modifier
                 .size(canvasW.dp, canvasH.dp)
+                .pointerHoverIcon(if (isPanningActive) PointerIcon.Hand else PointerIcon.Default)
+                // 1. Two-finger trackpad / mouse scroll pan & Cmd+Scroll zoom
+                .onPointerEvent(PointerEventType.Scroll) { event ->
+                    val change = event.changes.firstOrNull() ?: return@onPointerEvent
+                    val delta = change.scrollDelta
+                    if (event.keyboardModifiers.isMetaPressed || event.keyboardModifiers.isCtrlPressed) {
+                        if (delta.y < 0) state.zoomIn() else if (delta.y > 0) state.zoomOut()
+                    } else {
+                        // Smooth two-finger / scroll panning
+                        val maxPanX = (canvasW * state.zoomScale) * 0.85f
+                        val maxPanY = (canvasH * state.zoomScale) * 0.85f
+                        state.panOffsetX = (state.panOffsetX - delta.x * 22f).coerceIn(-maxPanX, maxPanX)
+                        state.panOffsetY = (state.panOffsetY - delta.y * 22f).coerceIn(-maxPanY, maxPanY)
+                    }
+                }
+                // 2. Drag gestures (Drawing, Erasing, and Pan)
                 .pointerInput(
                     state.activeTool,
                     state.selectedFrameIndex,
@@ -137,92 +151,89 @@ fun StopMotionCanvas(state: EditorState) {
                     state.brushSize,
                     state.zoomScale,
                     state.panOffsetX,
-                    state.panOffsetY
+                    state.panOffsetY,
+                    state.isSpaceHeld
                 ) {
                     val w = size.width.toFloat()
                     val h = size.height.toFloat()
 
-                    when (state.activeTool) {
-                        EditorTool.ERASER -> {
-                            detectDragGestures(
-                                onDragStart = { offset ->
-                                    hoverCursorPos = offset
-                                    val pt = screenToNorm(offset, w, h)
-                                    state.eraseStrokesNear(pt.x, pt.y, w, h, radiusPixels = state.brushSize * 1.5f)
-                                },
-                                onDrag = { change, _ ->
-                                    hoverCursorPos = change.position
-                                    val pt = screenToNorm(change.position, w, h)
-                                    state.eraseStrokesNear(pt.x, pt.y, w, h, radiusPixels = state.brushSize * 1.5f)
-                                },
-                                onDragEnd = {
-                                    hoverCursorPos = null
-                                }
-                            )
-                        }
-
-                        in listOf(
+                    // If Spacebar is held OR Hand tool is active OR Select tool is active: PAN
+                    if (state.isSpaceHeld || state.activeTool == EditorTool.HAND || state.activeTool == EditorTool.SELECT) {
+                        detectDragGestures(
+                            onDragStart = {
+                                state.wasPanDragTriggered = true
+                            },
+                            onDrag = { _, dragAmount ->
+                                state.wasPanDragTriggered = true
+                                val maxPanX = (w * state.zoomScale) * 0.85f
+                                val maxPanY = (h * state.zoomScale) * 0.85f
+                                state.panOffsetX = (state.panOffsetX + dragAmount.x).coerceIn(-maxPanX, maxPanX)
+                                state.panOffsetY = (state.panOffsetY + dragAmount.y).coerceIn(-maxPanY, maxPanY)
+                            }
+                        )
+                    } else if (state.activeTool == EditorTool.ERASER) {
+                        detectDragGestures(
+                            onDragStart = { offset ->
+                                hoverCursorPos = offset
+                                val pt = screenToNorm(offset, w, h)
+                                state.eraseStrokesNear(pt.x, pt.y, w, h, radiusPixels = state.brushSize * 1.5f)
+                            },
+                            onDrag = { change, _ ->
+                                hoverCursorPos = change.position
+                                val pt = screenToNorm(change.position, w, h)
+                                state.eraseStrokesNear(pt.x, pt.y, w, h, radiusPixels = state.brushSize * 1.5f)
+                            },
+                            onDragEnd = { hoverCursorPos = null }
+                        )
+                    } else if (state.activeTool in listOf(
                             EditorTool.DRAW_PEN,
                             EditorTool.DRAW_GLOW,
                             EditorTool.DRAW_CHALK,
                             EditorTool.DRAW_DASHED,
                             EditorTool.RIG_REMOVAL
-                        ) -> {
-                            detectDragGestures(
-                                onDragStart = { offset ->
-                                    hoverCursorPos = offset
-                                    activePoints = listOf(screenToNorm(offset, w, h))
-                                },
-                                onDrag = { change, _ ->
-                                    hoverCursorPos = change.position
-                                    activePoints = activePoints + screenToNorm(change.position, w, h)
-                                },
-                                onDragEnd = {
-                                    hoverCursorPos = null
-                                    if (activePoints.size >= 2) {
-                                        val currentStyle = when (state.activeTool) {
-                                            EditorTool.DRAW_GLOW -> DoodleStyle.NEON_GLOW
-                                            EditorTool.DRAW_CHALK -> DoodleStyle.SKETCH_CHALK
-                                            EditorTool.DRAW_DASHED -> DoodleStyle.DASHED_TRAIL
-                                            EditorTool.DRAW_PEN -> state.doodleStyle
-                                            else -> DoodleStyle.SOLID_PEN
-                                        }
-                                        val stroke = DrawingStroke(
-                                            points = activePoints,
-                                            colorHex = if (state.activeTool == EditorTool.RIG_REMOVAL) "#00000000" else state.brushColor.toHexArgb(),
-                                            strokeWidth = state.brushSize,
-                                            isGlow = currentStyle == DoodleStyle.NEON_GLOW,
-                                            isRigRemoval = state.activeTool == EditorTool.RIG_REMOVAL,
-                                            style = currentStyle
-                                        )
-                                        state.addDrawingStroke(stroke)
+                        )
+                    ) {
+                        detectDragGestures(
+                            onDragStart = { offset ->
+                                hoverCursorPos = offset
+                                activePoints = listOf(screenToNorm(offset, w, h))
+                            },
+                            onDrag = { change, _ ->
+                                hoverCursorPos = change.position
+                                activePoints = activePoints + screenToNorm(change.position, w, h)
+                            },
+                            onDragEnd = {
+                                hoverCursorPos = null
+                                if (activePoints.size >= 2) {
+                                    val currentStyle = when (state.activeTool) {
+                                        EditorTool.DRAW_GLOW -> DoodleStyle.NEON_GLOW
+                                        EditorTool.DRAW_CHALK -> DoodleStyle.SKETCH_CHALK
+                                        EditorTool.DRAW_DASHED -> DoodleStyle.DASHED_TRAIL
+                                        EditorTool.DRAW_PEN -> state.doodleStyle
+                                        else -> DoodleStyle.SOLID_PEN
                                     }
-                                    activePoints = emptyList()
+                                    val stroke = DrawingStroke(
+                                        points = activePoints,
+                                        colorHex = if (state.activeTool == EditorTool.RIG_REMOVAL) "#00000000" else state.brushColor.toHexArgb(),
+                                        strokeWidth = state.brushSize,
+                                        isGlow = currentStyle == DoodleStyle.NEON_GLOW,
+                                        isRigRemoval = state.activeTool == EditorTool.RIG_REMOVAL,
+                                        style = currentStyle
+                                    )
+                                    state.addDrawingStroke(stroke)
                                 }
-                            )
-                        }
-
-                        EditorTool.SELECT -> {
-                            // Pan viewport with drag
-                            detectDragGestures { change, dragAmount ->
-                                state.panOffsetX += dragAmount.x
-                                state.panOffsetY += dragAmount.y
+                                activePoints = emptyList()
                             }
-                        }
-
-                        else -> {
-                            if (state.splitCompare) {
-                                detectDragGestures { change, _ ->
-                                    state.splitPosition = (change.position.x / size.width).coerceIn(0.05f, 0.95f)
-                                }
-                            }
+                        )
+                    } else if (state.splitCompare) {
+                        detectDragGestures { change, _ ->
+                            state.splitPosition = (change.position.x / size.width).coerceIn(0.05f, 0.95f)
                         }
                     }
                 }
         ) {
             val canvasSize = size
 
-            // Apply Zoom & Pan Transform to entire stage
             withTransform({
                 translate(left = state.panOffsetX, top = state.panOffsetY)
                 scale(
@@ -231,7 +242,7 @@ fun StopMotionCanvas(state: EditorState) {
                     pivot = Offset(canvasSize.width / 2f, canvasSize.height / 2f)
                 )
             }) {
-                // 1. Draw Onion Skin (Past Frames)
+                // 1. Onion Skin (Past)
                 if (state.onionSkinEnabled && !state.isPlaying && state.onionSkinPastCount > 0) {
                     for (p in state.onionSkinPastCount downTo 1) {
                         val pastIdx = currIdx - p
@@ -252,7 +263,7 @@ fun StopMotionCanvas(state: EditorState) {
                     }
                 }
 
-                // 2. Draw Current Frame
+                // 2. Current Frame
                 if (currFrame != null) {
                     val processedImg = ImageProcessor.processFrame(currFrame, cleanPlateImg)
                         ?: ImageCache.getBufferedImage(currFrame.imagePath)
@@ -272,9 +283,7 @@ fun StopMotionCanvas(state: EditorState) {
                             val prevImg = ImageCache.getBufferedImage(prevFrame.imagePath)
                             val splitX = canvasSize.width * state.splitPosition
 
-                            if (prevImg != null) {
-                                drawFrameImage(prevImg, canvasSize, alpha = 1.0f)
-                            }
+                            if (prevImg != null) drawFrameImage(prevImg, canvasSize, alpha = 1.0f)
                             drawFrameImage(processedImg, canvasSize, alpha = 1.0f)
 
                             drawLine(
@@ -289,7 +298,7 @@ fun StopMotionCanvas(state: EditorState) {
                     }
                 }
 
-                // 3. Draw Onion Skin (Future Frames)
+                // 3. Onion Skin (Future)
                 if (state.onionSkinEnabled && !state.isPlaying && state.onionSkinFutureCount > 0) {
                     for (f in 1..state.onionSkinFutureCount) {
                         val futureIdx = currIdx + f
@@ -310,7 +319,7 @@ fun StopMotionCanvas(state: EditorState) {
                     }
                 }
 
-                // 4. Draw Active Drag Stroke in Progress
+                // 4. In-progress Stroke
                 if (activePoints.size >= 2) {
                     val strokeColor = if (state.activeTool == EditorTool.RIG_REMOVAL) Color.Cyan.copy(alpha = 0.5f) else state.brushColor
                     val scaledStrokeWidth = state.brushSize * (canvasSize.width / 800f).coerceAtLeast(1f)
@@ -327,25 +336,27 @@ fun StopMotionCanvas(state: EditorState) {
                     }
                 }
 
-                // 5. Visual Guides
+                // 5. Guides
                 if (state.showGrid) drawGridGuides(canvasSize)
                 if (state.showSafeZone) drawSafeActionMargins(canvasSize)
                 if (state.showCenterCross) drawCenterCrosshair(canvasSize)
             }
 
-            // 6. Draw Live Cursor Ring (shows brush/eraser size for the NEXT stroke)
-            hoverCursorPos?.let { pos ->
-                val radius = if (state.activeTool == EditorTool.ERASER) {
-                    state.brushSize * 1.5f * state.zoomScale
-                } else {
-                    (state.brushSize * (canvasSize.width / 800f) / 2f) * state.zoomScale
+            // 6. Live Cursor Ring
+            if (!isPanningActive) {
+                hoverCursorPos?.let { pos ->
+                    val radius = if (state.activeTool == EditorTool.ERASER) {
+                        state.brushSize * 1.5f * state.zoomScale
+                    } else {
+                        (state.brushSize * (canvasSize.width / 800f) / 2f) * state.zoomScale
+                    }
+                    drawCircle(
+                        color = if (state.activeTool == EditorTool.ERASER) Color.Red.copy(alpha = 0.7f) else state.brushColor.copy(alpha = 0.8f),
+                        radius = radius.coerceAtLeast(2f),
+                        center = pos,
+                        style = Stroke(width = 1.5f)
+                    )
                 }
-                drawCircle(
-                    color = if (state.activeTool == EditorTool.ERASER) Color.Red.copy(alpha = 0.7f) else state.brushColor.copy(alpha = 0.8f),
-                    radius = radius.coerceAtLeast(2f),
-                    center = pos,
-                    style = Stroke(width = 1.5f)
-                )
             }
         }
     }
@@ -374,8 +385,7 @@ fun ZoomControlsHUD(state: EditorState, modifier: Modifier = Modifier) {
                 }
             }
 
-            // Clickable percentage to reset zoom
-            StudioTooltip("Reset Zoom to 100%", "Cmd 0") {
+            StudioTooltip("Reset Zoom & Center", "Cmd 0") {
                 Text(
                     text = "${(state.zoomScale * 100).toInt()}%",
                     fontSize = 11.sp,
@@ -398,7 +408,7 @@ fun ZoomControlsHUD(state: EditorState, modifier: Modifier = Modifier) {
             }
 
             if (state.zoomScale != 1.0f || state.panOffsetX != 0f || state.panOffsetY != 0f) {
-                StudioTooltip("Fit to Screen") {
+                StudioTooltip("Center & Fit Viewport") {
                     IconButton(
                         onClick = { state.resetZoom() },
                         modifier = Modifier.size(24.dp)

@@ -573,6 +573,77 @@ private fun DoodleSettingsPanel(settings: AppSettings, onUpdate: (AppSettings) -
 private fun ExportSettingsPanel(settings: AppSettings, onUpdate: (AppSettings) -> Unit) {
     LazyColumn(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item {
+            Text("DEFAULT STOP MOTION WORKSPACE PATH", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = StudioPrimary)
+            Spacer(Modifier.height(4.dp))
+            Text("Set the default folder where all projects, captures, and exports are stored.", fontSize = 11.sp, color = StudioTextSecondary)
+        }
+
+        item {
+            Surface(
+                color = StudioDark,
+                shape = RoundedCornerShape(8.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, StudioBorder),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(Icons.Default.FolderSpecial, null, tint = StudioPrimary, modifier = Modifier.size(20.dp))
+                        Text(settings.defaultProjectsPath, fontSize = 12.sp, fontWeight = FontWeight.Medium, color = StudioTextPrimary)
+                    }
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = {
+                                val chosen = com.stopmotion.animator.util.NativeFileDialogs.chooseDirectory(
+                                    title = "Choose Default Stop Motion Folder",
+                                    defaultDirectory = settings.defaultProjectsPath
+                                )
+                                if (chosen != null) {
+                                    onUpdate(settings.copy(defaultProjectsPath = chosen.absolutePath))
+                                }
+                            },
+                            shape = RoundedCornerShape(6.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = StudioCard)
+                        ) {
+                            Icon(Icons.Default.FolderOpen, null, modifier = Modifier.size(14.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Browse Folder...", fontSize = 11.sp)
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                val dir = java.io.File(settings.defaultProjectsPath)
+                                dir.mkdirs()
+                                if (java.awt.Desktop.isDesktopSupported()) {
+                                    java.awt.Desktop.getDesktop().open(dir)
+                                }
+                            },
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Icon(Icons.Default.OpenInNew, null, modifier = Modifier.size(14.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Open in Finder", fontSize = 11.sp)
+                        }
+
+                        TextButton(
+                            onClick = {
+                                val defaultDir = java.io.File(System.getProperty("user.home"), "StopMotionProjects").absolutePath
+                                onUpdate(settings.copy(defaultProjectsPath = defaultDir))
+                            }
+                        ) {
+                            Text("Reset", fontSize = 11.sp, color = StudioTextMuted)
+                        }
+                    }
+                }
+            }
+        }
+
+        item {
+            HorizontalDivider(color = StudioBorder)
+            Spacer(Modifier.height(8.dp))
             Text("EXPORT & PROJECT STORAGE", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = StudioPrimary)
             Spacer(Modifier.height(4.dp))
             Text("Video encoding quality presets and autosave settings.", fontSize = 11.sp, color = StudioTextSecondary)
@@ -628,7 +699,6 @@ private fun ExportSettingsPanel(settings: AppSettings, onUpdate: (AppSettings) -
         }
     }
 }
-
 @Composable
 private fun SystemSettingsPanel(state: EditorState, onUpdate: (AppSettings) -> Unit) {
     LazyColumn(verticalArrangement = Arrangement.spacedBy(16.dp)) {

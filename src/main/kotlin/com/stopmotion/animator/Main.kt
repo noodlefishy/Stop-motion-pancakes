@@ -39,16 +39,60 @@ fun main() = application {
         },
         title = "Stop Motion Pancake — ${editorState.project.title}",
         state = windowState,
-        onKeyEvent = { keyEvent ->
+onKeyEvent = { keyEvent ->
             if (NativeFileDialogs.isNativeDialogVisible) {
                 return@Window false
             }
+
+            // Spacebar release: if we were not dragging to pan, toggle playback
+            if (keyEvent.type == KeyEventType.KeyUp && keyEvent.key == Key.Spacebar) {
+                val wasPanning = editorState.wasPanDragTriggered
+                editorState.isSpaceHeld = false
+                editorState.wasPanDragTriggered = false
+                if (!wasPanning && !editorState.isCameraCaptureDialogVisible) {
+                    editorState.togglePlayback()
+                }
+                return@Window true
+            }
+
             if (keyEvent.type == KeyEventType.KeyDown) {
                 when {
-                    // Cmd+S: Save Project Passively
+                    // Spacebar press: enter hold-to-pan mode
+                    keyEvent.key == Key.Spacebar && !keyEvent.isMetaPressed -> {
+                        if (editorState.isCameraCaptureDialogVisible) {
+                            editorState.triggerCameraSnap()
+                            true
+                        } else {
+                            editorState.isSpaceHeld = true
+                            true
+                        }
+                    }
+                    // H: Hand / Pan Tool
+                    keyEvent.key == Key.H && !keyEvent.isMetaPressed -> {
+                        editorState.activeTool = EditorTool.HAND
+                        editorState.showToast("Hand Pan Tool (or hold Spacebar to pan)")
+                        true
+                    }
+                    // Cmd+N: New Project in default path
+                    keyEvent.isMetaPressed && keyEvent.key == Key.N -> {
+                        val defaultDir = editorState.settings.defaultProjectsPath
+                        java.io.File(defaultDir).mkdirs()
+                        val target = NativeFileDialogs.chooseNewProjectLocation(defaultDirectory = defaultDir)
+                        if (target != null) {
+                            val title = target.nameWithoutExtension.ifBlank { "Untitled" }
+                            editorState.project = com.stopmotion.animator.model.AnimationProject(
+                                title = title,
+                                projectDirectory = target.parentFile?.absolutePath ?: defaultDir
+                            )
+                            editorState.saveProjectToJson(target)
+                            editorState.showToast("Created project: $title")
+                        }
+                        true
+                    }
+                    // Cmd+S: Save Project Passively using project or default directory
                     keyEvent.isMetaPressed && keyEvent.key == Key.S && !keyEvent.isShiftPressed -> {
                         editorState.saveProjectPassively {
-                            val dir = editorState.project.projectDirectory ?: System.getProperty("user.home")
+                            val dir = editorState.project.projectDirectory ?: editorState.settings.defaultProjectsPath
                             val file = NativeFileDialogs.saveProject(
                                 defaultName = "${editorState.project.title}.smproj",
                                 defaultDirectory = dir
@@ -61,7 +105,7 @@ fun main() = application {
                     }
                     // Cmd+Shift+S: Save Project As...
                     keyEvent.isMetaPressed && keyEvent.key == Key.S && keyEvent.isShiftPressed -> {
-                        val dir = editorState.project.projectDirectory ?: System.getProperty("user.home")
+                        val dir = editorState.project.projectDirectory ?: editorState.settings.defaultProjectsPath
                         val file = NativeFileDialogs.saveProject(
                             defaultName = "${editorState.project.title}.smproj",
                             defaultDirectory = dir
@@ -71,17 +115,11 @@ fun main() = application {
                         }
                         true
                     }
-                    // Spacebar or Enter
-                    keyEvent.key == Key.Spacebar || keyEvent.key == Key.Enter -> {
+                    keyEvent.key == Key.Enter -> {
                         if (editorState.isCameraCaptureDialogVisible) {
                             editorState.triggerCameraSnap()
                             true
-                        } else if (keyEvent.key == Key.Spacebar) {
-                            editorState.togglePlayback()
-                            true
-                        } else {
-                            false
-                        }
+                        } else false
                     }
                     // Left Arrow: Step -1 frame
                     keyEvent.key == Key.DirectionLeft -> {
@@ -135,7 +173,11 @@ fun main() = application {
                         editorState.showToast("Doodle Pen Tool")
                         true
                     }
-                    // C: Camera Capture Dialog
+                    keyEvent.key == Key.E && !keyEvent.isMetaPressed -> {
+                        editorState.activeTool = EditorTool.ERASER
+                        editorState.showToast("Eraser Tool")
+                        true
+                    }
                     keyEvent.key == Key.C && !keyEvent.isMetaPressed -> {
                         editorState.isCameraCaptureDialogVisible = true
                         true
@@ -161,7 +203,6 @@ fun main() = application {
                         editorState.zoomIn()
                         true
                     }
-                    // Cmd + Minus: Zoom Out
                     keyEvent.isMetaPressed && (keyEvent.key == Key.Minus || keyEvent.key == Key.NumPadSubtract) -> {
                         editorState.zoomOut()
                         true

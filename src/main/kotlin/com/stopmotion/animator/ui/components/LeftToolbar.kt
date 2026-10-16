@@ -31,11 +31,21 @@ fun LeftToolbar(state: EditorState) {
         // Main Editing Tools
         ToolIconButton(
             icon = Icons.Default.NearMe,
-            tooltip = "Select / Pan Tool",
+            tooltip = "Select",
             shortcut = "V",
             isSelected = state.activeTool == EditorTool.SELECT,
             onClick = { state.activeTool = EditorTool.SELECT }
         )
+        
+        ToolIconButton(
+            icon = Icons.Default.PanTool,
+            tooltip = "Hand Tool (Pan Viewport)",
+            shortcut = "H",
+            isSelected = state.activeTool == EditorTool.HAND,
+            selectedColor = StudioSecondary,
+            onClick = { state.activeTool = EditorTool.HAND }
+        )
+
 
         ToolIconButton(
             icon = Icons.Default.Edit,

@@ -129,7 +129,6 @@ fun CameraCaptureDialog(state: EditorState) {
         val captureDir = File(System.getProperty("user.home"), ".stopmotion_animator/captures")
         captureDir.mkdirs()
         val destFile = File(captureDir, "capture_${System.currentTimeMillis()}.png")
-
         val success = CameraManager.captureFrame(selectedCameraId, destFile, resolution = selectedResolution)
         isCapturing = false
 
@@ -193,6 +192,12 @@ fun CameraCaptureDialog(state: EditorState) {
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Icon(Icons.Default.Videocam, null, tint = StudioAccent, modifier = Modifier.size(22.dp))
+                        Text(
+                            "Stop Motion Pancake — Camera Studio",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = StudioTextPrimary
+                        )
                         Text(
                             "Stop Motion Pancake — Camera Studio",
                             fontSize = 15.sp,
@@ -288,6 +293,12 @@ fun CameraCaptureDialog(state: EditorState) {
                                     tint = StudioTextSecondary,
                                     modifier = Modifier.size(16.dp)
                                 )
+                                Icon(
+                                    Icons.Default.ArrowDropDown,
+                                    null,
+                                    tint = StudioTextSecondary,
+                                    modifier = Modifier.size(16.dp)
+                                )
                             }
                         }
 
@@ -358,6 +369,18 @@ fun CameraCaptureDialog(state: EditorState) {
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
+                                Text(
+                                    selectedResolution,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = StudioSecondary
+                                )
+                                Icon(
+                                    Icons.Default.ArrowDropDown,
+                                    null,
+                                    tint = StudioTextSecondary,
+                                    modifier = Modifier.size(14.dp)
+                                )
                                 Text(
                                     selectedResolution,
                                     fontSize = 11.sp,
@@ -455,6 +478,16 @@ fun CameraCaptureDialog(state: EditorState) {
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White
                             )
+                            Box(
+                                modifier = Modifier.size(8.dp).clip(CircleShape)
+                                    .background(if (liveFrame != null) StudioAccent else StudioWarning)
+                            )
+                            Text(
+                                if (liveFrame != null) "LIVE FEED" else "CONNECTING",
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
                         }
                     }
 
@@ -504,6 +537,11 @@ fun CameraCaptureDialog(state: EditorState) {
                         )
 
                         if (viewfinderOnionSkin) {
+                            Text(
+                                "${(viewfinderOnionOpacity * 100).toInt()}%",
+                                fontSize = 10.sp,
+                                color = StudioTextSecondary
+                            )
                             Text(
                                 "${(viewfinderOnionOpacity * 100).toInt()}%",
                                 fontSize = 10.sp,

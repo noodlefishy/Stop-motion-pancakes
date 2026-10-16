@@ -22,24 +22,20 @@ class CameraStreamer {
     var latestBufferedImage: BufferedImage? = null
         private set
 
-    // The device ID and capture resolution currently streaming, used by snapHighRes
-    @Volatile private var currentDeviceId: String = "0"
-    @Volatile private var captureResolution: String = "1920x1080"
-
     /**
-     * Start the live preview at a fast low resolution (always 640x480) regardless
-     * of the user's chosen capture resolution.  The capture resolution is remembered
-     * so that snapHighRes() can grab a full-quality still separately.
+     * Start the live camera stream at the given [streamRes].
+     *
+     * Higher resolutions use a lower framerate so that Continuity Camera
+     * (iPhone/iPad) feeds remain stable — avfoundation at 30 fps + 1080p
+     * over wireless often stalls or delivers a single frame.
      */
     fun start(
         deviceId: String,
-        captureRes: String = "1920x1080", // the resolution used when snapping
+        streamRes: String = "1280x720",
         scope: CoroutineScope,
         onFrame: (ImageBitmap) -> Unit
     ) {
         stop()
-        currentDeviceId = deviceId
-        captureResolution = captureRes
 
         streamJob = scope.launch(Dispatchers.IO) {
             try {
@@ -48,20 +44,23 @@ class CameraStreamer {
                 val format = PlatformUtils.getCameraFormat()
                 val inputTarget = PlatformUtils.getCameraInputTarget(deviceId)
 
-                // Always stream preview at 640x480 — avfoundation initialises
-                // much faster and iphone continuity feeds stay continuous.
-                val previewRes = "640x480"
+                // Adapt framerate to resolution so Continuity Cameras cope.
+                val fps = when (streamRes) {
+                    "1920x1080" -> "15"
+                    "1280x720"  -> "20"
+                    else        -> "30"   // 640x480 and below
+                }
 
                 val cmd = listOf(
                     ffmpeg,
                     "-y",
                     "-f", format,
-                    "-framerate", "30",
-                    "-video_size", previewRes,
+                    "-framerate", fps,
+                    "-video_size", streamRes,
                     "-i", inputTarget,
                     "-f", "image2pipe",
                     "-vcodec", "mjpeg",
-                    "-q:v", "5",   // decent quality MJPEG without crushing the pipe
+                    "-q:v", "2",   // high quality — these frames are also our captures
                     "-"
                 )
 
@@ -70,8 +69,8 @@ class CameraStreamer {
                     .start()
                 process = proc
 
-                val inputStream = BufferedInputStream(proc.inputStream, 32768)
-                val buffer = ByteArrayOutputStream(131072)
+                val inputStream = BufferedInputStream(proc.inputStream, 65536)
+                val buffer = ByteArrayOutputStream(262144)
                 var prevByte = -1
                 var inImage = false
 
@@ -88,8 +87,8 @@ class CameraStreamer {
                         }
                     } else {
                         buffer.write(b)
-                        if (buffer.size() > 1_500_000) {
-                            // Drop corrupted packets
+                        if (buffer.size() > 4_000_000) {
+                            // Drop corrupted / oversized packets
                             inImage = false
                             buffer.reset()
                         } else if (prevByte == 0xFF && b == 0xD9) {
@@ -120,35 +119,28 @@ class CameraStreamer {
     }
 
     /**
-     * Snap a full-resolution still from the camera.
+     * Instantly capture a frame by saving the current live-stream buffer
+     * to [destFile] as a PNG.
      *
-     * On macOS avfoundation only allows one process at a time on a given device,
-     * so we must **stop** the live preview stream, run the high-res single-frame
-     * capture, and then **restart** the preview.  The caller supplies a
-     * [restartPreview] callback that will be invoked (on the main thread) after
-     * the capture completes so the live feed resumes.
+     * This **never** interrupts the stream — no camera switching,
+     * no Continuity Camera reconnection, no delay.  The captured image
+     * is at whatever resolution the stream is running at.
      */
-    fun snapHighRes(
-        destFile: File,
-        scope: CoroutineScope,
-        restartPreview: (() -> Unit)? = null,
-        onDone: (Boolean) -> Unit
-    ) {
-        // Tear down the live stream so the camera device is free.
-        stop()
-
+    fun snapCurrentFrame(destFile: File, scope: CoroutineScope, onDone: (Boolean) -> Unit) {
+        val img = latestBufferedImage
+        if (img == null) {
+            onDone(false)
+            return
+        }
         scope.launch(Dispatchers.IO) {
-            destFile.parentFile?.mkdirs()
             val success = try {
-                CameraManager.captureFrame(currentDeviceId, destFile, captureResolution)
+                destFile.parentFile?.mkdirs()
+                ImageIO.write(img, "PNG", destFile)
+                destFile.exists() && destFile.length() > 0
             } catch (_: Exception) {
                 false
             }
-            withContext(Dispatchers.Main) {
-                // Restart the preview first, then report result.
-                restartPreview?.invoke()
-                onDone(success)
-            }
+            withContext(Dispatchers.Main) { onDone(success) }
         }
     }
 

@@ -42,7 +42,7 @@ fun CameraCaptureDialog(state: EditorState) {
     var isRefreshingCameras by remember { mutableStateOf(false) }
 
     var livePreviewFrame by remember { mutableStateOf<ImageBitmap?>(null) }
-    var selectedResolution by remember { mutableStateOf("1920x1080") }
+    var selectedResolution by remember { mutableStateOf("1280x720") }
     var resolutionDropdownOpen by remember { mutableStateOf(false) }
 
     var isCapturing by remember { mutableStateOf(false) }
@@ -57,7 +57,7 @@ fun CameraCaptureDialog(state: EditorState) {
         livePreviewFrame = null
         streamer.start(
             deviceId = deviceId,
-            captureRes = selectedResolution,
+            streamRes = selectedResolution,
             scope = coroutineScope
         ) { frame ->
             livePreviewFrame = frame
@@ -90,25 +90,19 @@ fun CameraCaptureDialog(state: EditorState) {
     fun triggerSnap() {
         if (isCapturing) return
         isCapturing = true
-        // Blank the preview while the camera is temporarily stopped for the hi-res grab
-        livePreviewFrame = null
         val captureDir = File(System.getProperty("user.home"), ".stopmotion_animator/captures")
         captureDir.mkdirs()
         val destFile = File(captureDir, "capture_${System.currentTimeMillis()}.png")
 
-        // snapHighRes stops the preview stream, captures a full-res still,
-        // then invokes restartPreview so the live feed comes back.
-        streamer.snapHighRes(
-            destFile = destFile,
-            scope = coroutineScope,
-            restartPreview = { restartStream(selectedCameraId) }
-        ) { success ->
+        // Save directly from the live stream buffer — instant, no stream
+        // interruption, no Continuity Camera reconnection.
+        streamer.snapCurrentFrame(destFile, coroutineScope) { success ->
             isCapturing = false
             if (success) {
                 state.addImportedImages(listOf(destFile))
                 state.showToast("Captured frame added to timeline! ($selectedResolution)")
             } else {
-                state.showToast("Capture failed. Ensure camera is connected.")
+                state.showToast("Capture failed — no live frame available yet.")
             }
         }
     }
@@ -294,7 +288,7 @@ fun CameraCaptureDialog(state: EditorState) {
                             expanded = resolutionDropdownOpen,
                             onDismissRequest = { resolutionDropdownOpen = false }
                         ) {
-                            listOf("1920x1080" to "1080p (Full HD)", "1280x720" to "720p (HD)").forEach { (res, label) ->
+                            listOf("1920x1080" to "1080p (Full HD)", "1280x720" to "720p (HD)", "640x480" to "480p (Fast)").forEach { (res, label) ->
                                 DropdownMenuItem(
                                     text = { Text(label, fontSize = 11.sp) },
                                     onClick = {

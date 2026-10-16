@@ -42,8 +42,6 @@ fun CameraCaptureDialog(state: EditorState) {
     var isRefreshingCameras by remember { mutableStateOf(false) }
 
     var livePreviewFrame by remember { mutableStateOf<ImageBitmap?>(null) }
-    var selectedResolution by remember { mutableStateOf("1280x720") }
-    var resolutionDropdownOpen by remember { mutableStateOf(false) }
 
     var isCapturing by remember { mutableStateOf(false) }
     var countdownValue by remember { mutableStateOf<Int?>(null) }
@@ -57,7 +55,6 @@ fun CameraCaptureDialog(state: EditorState) {
         livePreviewFrame = null
         streamer.start(
             deviceId = deviceId,
-            streamRes = selectedResolution,
             scope = coroutineScope
         ) { frame ->
             livePreviewFrame = frame
@@ -100,7 +97,7 @@ fun CameraCaptureDialog(state: EditorState) {
             isCapturing = false
             if (success) {
                 state.addImportedImages(listOf(destFile))
-                state.showToast("Captured frame added to timeline! ($selectedResolution)")
+                state.showToast("Captured frame added to timeline!")
             } else {
                 state.showToast("Capture failed — no live frame available yet.")
             }
@@ -261,45 +258,46 @@ fun CameraCaptureDialog(state: EditorState) {
                         }
                     }
 
-                    // Resolution Dropdown
-                    Box {
-                        Surface(
-                            color = StudioDark,
-                            shape = RoundedCornerShape(6.dp),
-                            modifier = Modifier
-                                .height(38.dp)
-                                .clip(RoundedCornerShape(6.dp))
-                                .clickable { resolutionDropdownOpen = true }
-                                .border(1.dp, StudioBorder, RoundedCornerShape(6.dp))
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxHeight()
-                                    .padding(horizontal = 10.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Text(selectedResolution, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = StudioSecondary)
-                                Icon(Icons.Default.ArrowDropDown, null, tint = StudioTextSecondary, modifier = Modifier.size(14.dp))
-                            }
-                        }
+                    // // Resolution Dropdown
+                    // Box {
+                    //     Surface(
+                    //         color = StudioDark,
+                    //         shape = RoundedCornerShape(6.dp),
+                    //         modifier = Modifier
+                    //             .height(38.dp)
+                    //             .clip(RoundedCornerShape(6.dp))
+                    //             .clickable { resolutionDropdownOpen = true }
+                    //             .border(1.dp, StudioBorder, RoundedCornerShape(6.dp))
+                    //     ) {
+                    //         Row(
+                    //             modifier = Modifier
+                    //                 .fillMaxHeight()
+                    //                 .padding(horizontal = 10.dp),
+                    //             verticalAlignment = Alignment.CenterVertically,
+                    //             horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    //         ) {
+                    //             Text(selectedResolution, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = StudioSecondary)
+                    //             Icon(Icons.Default.ArrowDropDown, null, tint = StudioTextSecondary, modifier = Modifier.size(14.dp))
+                    //         }
+                    //     }
 
-                        DropdownMenu(
-                            expanded = resolutionDropdownOpen,
-                            onDismissRequest = { resolutionDropdownOpen = false }
-                        ) {
-                            listOf("1920x1080" to "1080p (Full HD)", "1280x720" to "720p (HD)", "640x480" to "480p (Fast)").forEach { (res, label) ->
-                                DropdownMenuItem(
-                                    text = { Text(label, fontSize = 11.sp) },
-                                    onClick = {
-                                        selectedResolution = res
-                                        resolutionDropdownOpen = false
-                                        restartStream(selectedCameraId)
-                                    }
-                                )
-                            }
-                        }
-                    }
+                    //     DropdownMenu(
+                    //         expanded = resolutionDropdownOpen,
+                    //         onDismissRequest = { resolutionDropdownOpen = false }
+                    //     ) {
+                    //         listOf("1920x1080" to "1080p (Full HD)", "1280x720" to "720p (HD)", "640x480" to "480p (Fast)").forEach { (res, label) ->
+                    //             DropdownMenuItem(
+                    //                 text = { Text(label, fontSize = 11.sp) },
+                    //                 onClick = {
+                    //                     selectedResolution = res
+                    //                     resolutionDropdownOpen = false
+                    //                     restartStream(selectedCameraId)
+                    //                 }
+                    //             )
+                    //         }
+                    //     }
+                    // }
+                
                 }
 
                 // Viewfinder Box

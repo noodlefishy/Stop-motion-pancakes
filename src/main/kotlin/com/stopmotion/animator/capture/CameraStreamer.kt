@@ -23,15 +23,15 @@ class CameraStreamer {
         private set
 
     /**
-     * Start the live camera stream at the given [streamRes].
+     * Start the live camera stream at 640x480.
      *
-     * Higher resolutions use a lower framerate so that Continuity Camera
-     * (iPhone/iPad) feeds remain stable — avfoundation at 30 fps + 1080p
-     * over wireless often stalls or delivers a single frame.
+     * Higher resolutions (720p, 1080p) cause avfoundation to stall or
+     * deliver only a single frame, especially with Continuity Cameras.
+     * 640x480 at 30 fps is the only setting that works reliably across
+     * built-in and wireless cameras on macOS.
      */
     fun start(
         deviceId: String,
-        streamRes: String = "1280x720",
         scope: CoroutineScope,
         onFrame: (ImageBitmap) -> Unit
     ) {
@@ -44,23 +44,18 @@ class CameraStreamer {
                 val format = PlatformUtils.getCameraFormat()
                 val inputTarget = PlatformUtils.getCameraInputTarget(deviceId)
 
-                // Adapt framerate to resolution so Continuity Cameras cope.
-                val fps = when (streamRes) {
-                    "1920x1080" -> "15"
-                    "1280x720"  -> "20"
-                    else        -> "30"   // 640x480 and below
-                }
-
+                // 640x480 at 30 fps — the only reliable setting for
+                // both built-in and Continuity Cameras on macOS.
                 val cmd = listOf(
                     ffmpeg,
                     "-y",
                     "-f", format,
-                    "-framerate", fps,
-                    "-video_size", streamRes,
+                    "-framerate", "30",
+                    "-video_size", "640x480",
                     "-i", inputTarget,
                     "-f", "image2pipe",
                     "-vcodec", "mjpeg",
-                    "-q:v", "2",   // high quality — these frames are also our captures
+                    "-q:v", "2",   // high quality MJPEG for best capture fidelity
                     "-"
                 )
 

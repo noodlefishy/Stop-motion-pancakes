@@ -94,19 +94,49 @@ fun CameraCaptureDialog(state: EditorState) {
         if (isCapturing) return
         isCapturing = true
         coroutineScope.launch {
-            val captureDir = File(System.getProperty("user.home"), ".stopmotion_animator/captures")
-            captureDir.mkdirs()
-            val destFile = File(captureDir, "capture_${System.currentTimeMillis()}.png")
+            try {
+                // 1. Stop the live stream to release the AVFoundation device lock
+                streamer.stop()
+                delay(250) // Allow macOS / Continuity Camera session to release cleanly
 
-            val success = CameraManager.captureFrame(selectedCameraId, destFile, resolution = selectedResolution)
-            isCapturing = false
+                val captureDir = File(System.getProperty("user.home"), ".stopmotion_animator/captures")
+                captureDir.mkdirs()
+                val destFile = File(captureDir, "capture_${System.currentTimeMillis()}.png")
 
-            if (success) {
-                state.addImportedImages(listOf(destFile))
-                state.showToast("Captured frame added to timeline! (${selectedResolution})")
-            } else {
-                state.showToast("Capture failed. Ensure camera permissions are granted.")
+                // 2. Take the high-res still frame with exclusive camera access
+                val success = CameraManager.captureFrame(
+                    deviceId = selectedCameraId,
+                    destinationFile = destFile,
+                    resolution = selectedResolution
+                )
+
+                if (success) {
+                    state.addImportedImages(listOf(destFile))
+                    state.showToast("Captured frame added to timeline! (${selectedResolution})")
+                } else {
+                    state.showToast("Capture failed. Check camera connection.")
+                }
+            } finally {
+                // 3. Reconnect the live preview stream cleanly
+                restartStream(selectedCameraId)
+                isCapturing = false
             }
+        }
+    }        if (isCapturing) return
+    isCapturing = true
+    coroutineScope.launch {
+        val captureDir = File(System.getProperty("user.home"), ".stopmotion_animator/captures")
+        captureDir.mkdirs()
+        val destFile = File(captureDir, "capture_${System.currentTimeMillis()}.png")
+
+        val success = CameraManager.captureFrame(selectedCameraId, destFile, resolution = selectedResolution)
+        isCapturing = false
+
+        if (success) {
+            state.addImportedImages(listOf(destFile))
+            state.showToast("Captured frame added to timeline! (${selectedResolution})")
+        } else {
+            state.showToast("Capture failed. Ensure camera permissions are granted.")
         }
     }
 
@@ -162,7 +192,12 @@ fun CameraCaptureDialog(state: EditorState) {
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Icon(Icons.Default.Videocam, null, tint = StudioAccent, modifier = Modifier.size(22.dp))
-                        Text("Stop Motion Pancake — Camera Studio", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = StudioTextPrimary)
+                        Text(
+                            "Stop Motion Pancake — Camera Studio",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = StudioTextPrimary
+                        )
                     }
 
                     IconButton(
@@ -246,7 +281,12 @@ fun CameraCaptureDialog(state: EditorState) {
                                     }
                                 }
 
-                                Icon(Icons.Default.ArrowDropDown, null, tint = StudioTextSecondary, modifier = Modifier.size(16.dp))
+                                Icon(
+                                    Icons.Default.ArrowDropDown,
+                                    null,
+                                    tint = StudioTextSecondary,
+                                    modifier = Modifier.size(16.dp)
+                                )
                             }
                         }
 
@@ -317,8 +357,18 @@ fun CameraCaptureDialog(state: EditorState) {
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Text(selectedResolution, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = StudioSecondary)
-                                Icon(Icons.Default.ArrowDropDown, null, tint = StudioTextSecondary, modifier = Modifier.size(14.dp))
+                                Text(
+                                    selectedResolution,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = StudioSecondary
+                                )
+                                Icon(
+                                    Icons.Default.ArrowDropDown,
+                                    null,
+                                    tint = StudioTextSecondary,
+                                    modifier = Modifier.size(14.dp)
+                                )
                             }
                         }
 
@@ -394,8 +444,16 @@ fun CameraCaptureDialog(state: EditorState) {
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(if (liveFrame != null) StudioAccent else StudioWarning))
-                            Text(if (liveFrame != null) "LIVE FEED" else "CONNECTING", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Box(
+                                modifier = Modifier.size(8.dp).clip(CircleShape)
+                                    .background(if (liveFrame != null) StudioAccent else StudioWarning)
+                            )
+                            Text(
+                                if (liveFrame != null) "LIVE FEED" else "CONNECTING",
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
                         }
                     }
 
@@ -445,7 +503,11 @@ fun CameraCaptureDialog(state: EditorState) {
                         )
 
                         if (viewfinderOnionSkin) {
-                            Text("${(viewfinderOnionOpacity * 100).toInt()}%", fontSize = 10.sp, color = StudioTextSecondary)
+                            Text(
+                                "${(viewfinderOnionOpacity * 100).toInt()}%",
+                                fontSize = 10.sp,
+                                color = StudioTextSecondary
+                            )
                             Slider(
                                 value = viewfinderOnionOpacity,
                                 onValueChange = { viewfinderOnionOpacity = it },

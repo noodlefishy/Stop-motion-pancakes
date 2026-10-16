@@ -55,7 +55,10 @@ class CameraStreamer {
                     val b = inputStream.read()
                     if (b == -1) break
 
-                    if (!inImage) {
+                    if (buffer.size() > 1_000_000) {
+                        inImage = false
+                        buffer.reset()
+                    } else if (!inImage) {
                         if (prevByte == 0xFF && b == 0xD8) {
                             inImage = true
                             buffer.reset()

@@ -120,15 +120,17 @@ object CameraManager {
                 "-framerate", "30",
                 "-video_size", resolution,
                 "-i", inputTarget,
+                // Skip initial 3 frames so sensor exposure & auto-focus lock in cleanly
+                "-vf", "select=gte(n\\,3)",
                 "-vframes", "1",
                 "-update", "1",
                 destinationFile.absolutePath
             )
 
             val process = ProcessBuilder(cmd).redirectErrorStream(true).start()
-            val exitCode = process.waitFor()
+            val exitCode = process.waitFor(5, TimeUnit.SECONDS)
 
-            exitCode == 0 && destinationFile.exists() && destinationFile.length() > 0
+            destinationFile.exists() && destinationFile.length() > 0
         } catch (e: Exception) {
             e.printStackTrace()
             false

@@ -27,6 +27,7 @@ enum class EditorTool {
     DRAW_GLOW,
     DRAW_CHALK,
     DRAW_DASHED,
+    ERASER,
     RIG_REMOVAL,
     COLOR_GRADE,
     CHROMA_KEY

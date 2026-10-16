@@ -90,8 +90,7 @@ fun CameraCaptureDialog(state: EditorState) {
         val captureDir = File(System.getProperty("user.home"), ".stopmotion_animator/captures")
         captureDir.mkdirs()
         val destFile = File(captureDir, "capture_${System.currentTimeMillis()}.png")
-
-        // Save directly from the live stream buffer — instant, no stream
+        
         // interruption, no Continuity Camera reconnection.
         streamer.snapCurrentFrame(destFile, coroutineScope) { success ->
             isCapturing = false

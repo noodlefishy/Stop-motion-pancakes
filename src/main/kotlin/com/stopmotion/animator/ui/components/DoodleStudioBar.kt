@@ -79,6 +79,15 @@ fun DoodleStudioBar(state: EditorState, modifier: Modifier = Modifier) {
                     state.doodleStyle = DoodleStyle.DASHED_TRAIL
                     state.activeTool = EditorTool.DRAW_DASHED
                 }
+
+                DoodleStyleButton(
+                    label = "Eraser",
+                    icon = Icons.Default.CleaningServices,
+                    isSelected = state.activeTool == EditorTool.ERASER,
+                    selectedColor = Color(0xFFEF4444)
+                ) {
+                    state.activeTool = EditorTool.ERASER
+                }
             }
 
             VerticalDivider(color = StudioBorder, modifier = Modifier.height(24.dp))

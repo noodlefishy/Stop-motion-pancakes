@@ -10,7 +10,75 @@ import java.awt.image.BufferedImage
 import java.io.File
 
 class StopMotionEditorTest {
+    @Test
+    fun testStrokeEraserLogic() {
+        val stroke1 = DrawingStroke(
+            points = listOf(DrawingPoint(0.1f, 0.1f), DrawingPoint(0.2f, 0.2f)),
+            strokeWidth = 4f
+        )
+        val stroke2 = DrawingStroke(
+            points = listOf(DrawingPoint(0.8f, 0.8f), DrawingPoint(0.9f, 0.9f)),
+            strokeWidth = 4f
+        )
 
+        val state = com.stopmotion.animator.state.EditorState(skipInit = true)
+        val frame = FrameItem(drawings = listOf(stroke1, stroke2))
+        state.project = AnimationProject(frames = listOf(frame))
+        state.selectedFrameIndex = 0
+
+        // Erasing near (0.15, 0.15) should delete stroke1 but keep stroke2
+        val erased = state.eraseStrokesNear(
+            normX = 0.15f,
+            normY = 0.15f,
+            canvasWidth = 1000f,
+            canvasHeight = 1000f,
+            radiusPixels = 20f
+        )
+
+        assertTrue(erased)
+        assertEquals(1, state.project.frames[0].drawings.size)
+        assertEquals(stroke2.id, state.project.frames[0].drawings[0].id)
+    }
+
+    @Test
+    fun testBrushSizeDoesNotRetroactivelyModifyExistingStrokes() {
+        val state = com.stopmotion.animator.state.EditorState(skipInit = true)
+        val frame = FrameItem()
+        state.project = AnimationProject(frames = listOf(frame))
+        state.selectedFrameIndex = 0
+
+        // 1. Draw first stroke with brush size 6
+        state.brushSize = 6f
+        state.addDrawingStroke(DrawingStroke(strokeWidth = state.brushSize))
+        assertEquals(6f, state.project.frames[0].drawings[0].strokeWidth, 0.01f)
+
+        // 2. Change brush size to 24 for the NEXT stroke
+        state.brushSize = 24f
+        state.addDrawingStroke(DrawingStroke(strokeWidth = state.brushSize))
+
+        // Line 1 should remain 6f, line 2 should be 24f
+        assertEquals(2, state.project.frames[0].drawings.size)
+        assertEquals(6f, state.project.frames[0].drawings[0].strokeWidth, 0.01f)
+        assertEquals(24f, state.project.frames[0].drawings[1].strokeWidth, 0.01f)
+    }
+
+    @Test
+    fun testZoomLevelsAndReset() {
+        val state = com.stopmotion.animator.state.EditorState(skipInit = true)
+        assertEquals(1.0f, state.zoomScale, 0.001f)
+
+        state.zoomIn()
+        assertTrue(state.zoomScale > 1.0f)
+
+        state.zoomOut()
+        state.zoomOut()
+        assertTrue(state.zoomScale < 1.0f)
+
+        state.resetZoom()
+        assertEquals(1.0f, state.zoomScale, 0.001f)
+        assertEquals(0f, state.panOffsetX, 0.001f)
+        assertEquals(0f, state.panOffsetY, 0.001f)
+    }
     @Test
     fun testTimelineMappingWithHoldExposures() {
         val frame1 = FrameItem(holdDuration = 2) // frames 0, 1

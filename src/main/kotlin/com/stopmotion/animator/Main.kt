@@ -150,6 +150,27 @@ fun main() = application {
                         editorState.isSettingsDialogVisible = true
                         true
                     }
+                    // E: Eraser Tool
+                    keyEvent.key == Key.E && !keyEvent.isMetaPressed -> {
+                        editorState.activeTool = EditorTool.ERASER
+                        editorState.showToast("Eraser Tool")
+                        true
+                    }
+                    // Cmd + Plus / Equals: Zoom In
+                    keyEvent.isMetaPressed && (keyEvent.key == Key.Equals || keyEvent.key == Key.NumPadAdd) -> {
+                        editorState.zoomIn()
+                        true
+                    }
+                    // Cmd + Minus: Zoom Out
+                    keyEvent.isMetaPressed && (keyEvent.key == Key.Minus || keyEvent.key == Key.NumPadSubtract) -> {
+                        editorState.zoomOut()
+                        true
+                    }
+                    // Cmd + 0: Reset Zoom
+                    keyEvent.isMetaPressed && (keyEvent.key == Key.Zero || keyEvent.key == Key.NumPad0) -> {
+                        editorState.resetZoom()
+                        true
+                    }
                     else -> false
                 }
             } else {
@@ -248,6 +269,7 @@ fun main() = application {
                 }
                 Item("Undo Last Doodle Stroke") { editorState.undoLastDoodleStroke() }
                 Item("Clear Frame Doodles") { editorState.clearFrameDrawings() }
+                Item("Eraser Tool", shortcut = KeyShortcut(Key.E)) { editorState.activeTool = EditorTool.ERASER }
                 Separator()
                 Item("Stamp Star ★") { editorState.stampDoodle("STAR") }
                 Item("Stamp Lightning ⚡") { editorState.stampDoodle("LIGHTNING") }
@@ -273,6 +295,10 @@ fun main() = application {
                 CheckboxItem("Safe Action Margins", checked = editorState.showSafeZone) { editorState.showSafeZone = !editorState.showSafeZone }
                 CheckboxItem("Split Screen Compare", checked = editorState.splitCompare) { editorState.splitCompare = !editorState.splitCompare }
                 CheckboxItem("Difference / Flicker Mode", checked = editorState.differenceMode) { editorState.differenceMode = !editorState.differenceMode }
+                Separator()
+                Item("Zoom In", shortcut = KeyShortcut(Key.Equals, meta = true)) { editorState.zoomIn() }
+                Item("Zoom Out", shortcut = KeyShortcut(Key.Minus, meta = true)) { editorState.zoomOut() }
+                Item("Fit to Screen / 100%", shortcut = KeyShortcut(Key.Zero, meta = true)) { editorState.resetZoom() }
             }
         }
 

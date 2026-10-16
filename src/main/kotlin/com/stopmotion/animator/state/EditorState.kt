@@ -78,7 +78,13 @@ class EditorState(
     private val redoStack = mutableListOf<AnimationProject>()
 
     private var playbackJob: Job? = null
-
+    
+    // --- Zoom & Pan State ---
+    var zoomScale by mutableStateOf(1.0f)
+    var panOffsetX by mutableStateOf(0f)
+    var panOffsetY by mutableStateOf(0f)
+    
+    
     val currentFrame: FrameItem?
         get() {
             if (project.frames.isEmpty()) return null
@@ -106,6 +112,95 @@ class EditorState(
                 }
             }
         }
+    }
+    
+    // --- Eraser Logic ---
+    /**
+     * Erases any doodle stroke on the currently selected frame that intersects
+     * within [radiusPixels] of the given normalized coordinates ([normX], [normY]).
+     * Returns true if any stroke was removed.
+     */
+    fun eraseStrokesNear(normX: Float, normY: Float, canvasWidth: Float, canvasHeight: Float, radiusPixels: Float): Boolean {
+        val idx = selectedFrameIndex
+        if (idx !in project.frames.indices) return false
+        val frame = project.frames[idx]
+        if (frame.drawings.isEmpty()) return false
+
+        val testPxX = normX * canvasWidth
+        val testPxY = normY * canvasHeight
+
+        val surviving = frame.drawings.filterNot { stroke ->
+            strokeIntersectsCircle(stroke, testPxX, testPxY, canvasWidth, canvasHeight, radiusPixels)
+        }
+
+        if (surviving.size != frame.drawings.size) {
+            pushUndo()
+            val updated = frame.copy(drawings = surviving)
+            val frames = project.frames.toMutableList()
+            frames[idx] = updated
+            project = project.copy(frames = frames)
+            return true
+        }
+        return false
+    }
+
+    private fun strokeIntersectsCircle(
+        stroke: DrawingStroke,
+        circleX: Float,
+        circleY: Float,
+        w: Float,
+        h: Float,
+        radius: Float
+    ): Boolean {
+        val pts = stroke.points
+        if (pts.isEmpty()) return false
+        val effectiveRadius = radius + (stroke.strokeWidth * (w / 800f).coerceAtLeast(1f)) / 2f
+
+        for (i in 0 until pts.size - 1) {
+            val p1x = pts[i].x * w
+            val p1y = pts[i].y * h
+            val p2x = pts[i + 1].x * w
+            val p2y = pts[i + 1].y * h
+
+            val dist = distToSegment(circleX, circleY, p1x, p1y, p2x, p2y)
+            if (dist <= effectiveRadius) return true
+        }
+        return false
+    }
+
+    private fun distToSegment(px: Float, py: Float, x1: Float, y1: Float, x2: Float, y2: Float): Float {
+        val dx = x2 - x1
+        val dy = y2 - y1
+        val lenSq = dx * dx + dy * dy
+        if (lenSq == 0f) {
+            val ex = px - x1
+            val ey = py - y1
+            return kotlin.math.sqrt(ex * ex + ey * ey)
+        }
+        val t = (((px - x1) * dx + (py - y1) * dy) / lenSq).coerceIn(0f, 1f)
+        val projX = x1 + t * dx
+        val projY = y1 + t * dy
+        val ex = px - projX
+        val ey = py - projY
+        return kotlin.math.sqrt(ex * ex + ey * ey)
+    }
+    
+        fun zoomIn() {
+        zoomScale = (zoomScale * 1.25f).coerceAtMost(5.0f)
+    }
+
+    fun zoomOut() {
+        zoomScale = (zoomScale / 1.25f).coerceAtLeast(0.5f)
+    }
+
+    fun resetZoom() {
+        zoomScale = 1.0f
+        panOffsetX = 0f
+        panOffsetY = 0f
+    }
+
+    fun setZoom(scale: Float) {
+        zoomScale = scale.coerceIn(0.5f, 5.0f)
     }
 
     private fun pushUndo() {

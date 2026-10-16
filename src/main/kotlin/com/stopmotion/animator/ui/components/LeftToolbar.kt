@@ -81,6 +81,14 @@ fun LeftToolbar(state: EditorState) {
                 state.doodleStyle = com.stopmotion.animator.model.DoodleStyle.DASHED_TRAIL
             }
         )
+         ToolIconButton(
+            icon = Icons.Default.CleaningServices,
+            tooltip = "Eraser Tool (Erase Doodles)",
+            shortcut = "E",
+            isSelected = state.activeTool == EditorTool.ERASER,
+            selectedColor = Color(0xFFEF4444),
+            onClick = { state.activeTool = EditorTool.ERASER }
+        )
 
         HorizontalDivider(
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),

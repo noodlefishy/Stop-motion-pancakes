@@ -224,8 +224,8 @@ fun FilmstripTimeline(state: EditorState, modifier: Modifier = Modifier) {
                                     )
                                 }
 
-                                // 3. Render in-progress stroke in real time if currently drawing on this frame
-                                if (idx == state.selectedFrameIndex && state.activeDrawingPoints.size >= 2) {
+                                // 3. Render in-progress stroke in real time if currently drawing on this frame (Never when using ERASER)
+                                if (idx == state.selectedFrameIndex && state.activeTool != EditorTool.ERASER && state.activeDrawingPoints.size >= 2) {
                                     val currentStyle = when (state.activeTool) {
                                         EditorTool.DRAW_GLOW -> DoodleStyle.NEON_GLOW
                                         EditorTool.DRAW_CHALK -> DoodleStyle.SKETCH_CHALK
@@ -270,7 +270,12 @@ fun FilmstripTimeline(state: EditorState, modifier: Modifier = Modifier) {
                             if (frame.holdDuration > 1) {
                                 Surface(
                                     color = StudioPrimary.copy(alpha = 0.9f),
-                                    shape = RoundedCornerShape(topStart = 0.dp, bottomEnd = 4.dp, topEnd = 0.dp, bottomStart = 0.dp),
+                                    shape = RoundedCornerShape(
+                                        topStart = 0.dp,
+                                        bottomEnd = 4.dp,
+                                        topEnd = 0.dp,
+                                        bottomStart = 0.dp
+                                    ),
                                     modifier = Modifier.align(Alignment.TopStart)
                                 ) {
                                     Text(

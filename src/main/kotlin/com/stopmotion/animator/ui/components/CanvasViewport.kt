@@ -85,9 +85,10 @@ fun CanvasViewport(state: EditorState, modifier: Modifier = Modifier) {
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun StopMotionCanvas(state: EditorState) {
-    var activePoints by remember { mutableStateOf(listOf<DrawingPoint>()) }
     var hoverCursorPos by remember { mutableStateOf<Offset?>(null) }
     var isDraggingBackground by remember { mutableStateOf(false) }
+    var isDrawingStroke by remember { mutableStateOf(false) }
+    var isErasingStroke by remember { mutableStateOf(false) }
 
     val currFrame = state.currentFrame
     val currIdx = state.selectedFrameIndex
@@ -113,14 +114,12 @@ fun StopMotionCanvas(state: EditorState) {
             modifier = Modifier
                 .fillMaxSize()
                 .pointerHoverIcon(if (isPanningActive || isDraggingBackground) PointerIcon.Hand else PointerIcon.Default)
-                // 1. Hover tracking across the entire screen
                 .onPointerEvent(PointerEventType.Move) { event ->
                     hoverCursorPos = event.changes.firstOrNull()?.position
                 }
                 .onPointerEvent(PointerEventType.Exit) {
                     hoverCursorPos = null
                 }
-                // 2. Trackpad two-finger scroll pan and Cmd/Ctrl + Scroll zoom
                 .onPointerEvent(PointerEventType.Scroll) { event ->
                     val change = event.changes.firstOrNull() ?: return@onPointerEvent
                     val delta = change.scrollDelta
@@ -131,7 +130,6 @@ fun StopMotionCanvas(state: EditorState) {
                         state.panOffsetY -= delta.y * 24f
                     }
                 }
-                // 3. Gestures: Drawing, Erasing, and Panning with full screen coverage
                 .pointerInput(
                     state.activeTool,
                     state.selectedFrameIndex,
@@ -148,7 +146,6 @@ fun StopMotionCanvas(state: EditorState) {
                     val viewportH = size.height.toFloat()
                     val targetAspect = state.project.aspectRatio.ratio
 
-                    // Compute base frame dimensions that fit inside viewport at 1x zoom
                     val baseW: Float
                     val baseH: Float
                     if (viewportW / viewportH > targetAspect) {
@@ -162,7 +159,6 @@ fun StopMotionCanvas(state: EditorState) {
                     val centerX = viewportW / 2f
                     val centerY = viewportH / 2f
 
-                    // Inverse coordinate projection: screen (x, y) -> frame normalized (0..1)
                     fun screenToFrameNorm(pos: Offset): DrawingPoint {
                         val frameW = baseW * state.zoomScale
                         val frameH = baseH * state.zoomScale
@@ -176,14 +172,17 @@ fun StopMotionCanvas(state: EditorState) {
                             hoverCursorPos = startPos
                             val pt = screenToFrameNorm(startPos)
                             val isInsideFrame = pt.x in 0f..1f && pt.y in 0f..1f
-                            
-                            state.activeDrawingPoints = listOf(DrawingPoint(pt.x.coerceIn(0f, 1f), pt.y.coerceIn(0f, 1f)))
-                            
+
                             if (isPanningActive || state.activeTool == EditorTool.SELECT || !isInsideFrame) {
-                                // User clicked outside the frame or has hand/space tool active -> Pan
                                 isDraggingBackground = true
+                                isDrawingStroke = false
+                                isErasingStroke = false
                                 state.wasPanDragTriggered = true
                             } else if (state.activeTool == EditorTool.ERASER) {
+                                isErasingStroke = true
+                                isDrawingStroke = false
+                                isDraggingBackground = false
+                                state.activeDrawingPoints = emptyList() // Do not record pen points!
                                 state.eraseStrokesNear(
                                     normX = pt.x,
                                     normY = pt.y,
@@ -199,69 +198,70 @@ fun StopMotionCanvas(state: EditorState) {
                                     EditorTool.RIG_REMOVAL
                                 )
                             ) {
-                                activePoints = listOf(DrawingPoint(pt.x.coerceIn(0f, 1f), pt.y.coerceIn(0f, 1f)))
+                                isDrawingStroke = true
+                                isErasingStroke = false
+                                isDraggingBackground = false
+                                state.activeDrawingPoints = listOf(DrawingPoint(pt.x.coerceIn(0f, 1f), pt.y.coerceIn(0f, 1f)))
                             }
                         },
                         onDrag = { change, dragAmount ->
                             hoverCursorPos = change.position
-                            val pt = screenToFrameNorm(change.position)
-                            state.activeDrawingPoints += DrawingPoint(pt.x.coerceIn(0f, 1f), pt.y.coerceIn(0f, 1f))
-                            
-                            
-                            if (isDraggingBackground || isPanningActive || state.activeTool == EditorTool.SELECT) {
+
+                            if (isDraggingBackground) {
                                 state.wasPanDragTriggered = true
                                 val maxPanX = (viewportW + baseW * state.zoomScale) * 0.75f
                                 val maxPanY = (viewportH + baseH * state.zoomScale) * 0.75f
                                 state.panOffsetX = (state.panOffsetX + dragAmount.x).coerceIn(-maxPanX, maxPanX)
                                 state.panOffsetY = (state.panOffsetY + dragAmount.y).coerceIn(-maxPanY, maxPanY)
-                            } else {
-                               
-
-                                if (state.activeTool == EditorTool.ERASER) {
-                                    state.eraseStrokesNear(
-                                        normX = pt.x.coerceIn(0f, 1f),
-                                        normY = pt.y.coerceIn(0f, 1f),
-                                        canvasWidth = baseW,
-                                        canvasHeight = baseH,
-                                        radiusPixels = state.brushSize * 1.5f * (baseW / 800f).coerceAtLeast(0.5f)
-                                    )
-                                } else if (state.activeTool in listOf(
-                                        EditorTool.DRAW_PEN,
-                                        EditorTool.DRAW_GLOW,
-                                        EditorTool.DRAW_CHALK,
-                                        EditorTool.DRAW_DASHED,
-                                        EditorTool.RIG_REMOVAL
-                                    )
-                                ) {
-                                    activePoints = activePoints + DrawingPoint(pt.x.coerceIn(0f, 1f), pt.y.coerceIn(0f, 1f))
-                                } else if (state.splitCompare) {
-                                    state.splitPosition = pt.x.coerceIn(0.05f, 0.95f)
-                                }
+                            } else if (isErasingStroke && state.activeTool == EditorTool.ERASER) {
+                                val pt = screenToFrameNorm(change.position)
+                                state.eraseStrokesNear(
+                                    normX = pt.x.coerceIn(0f, 1f),
+                                    normY = pt.y.coerceIn(0f, 1f),
+                                    canvasWidth = baseW,
+                                    canvasHeight = baseH,
+                                    radiusPixels = state.brushSize * 1.5f * (baseW / 800f).coerceAtLeast(0.5f)
+                                )
+                            } else if (isDrawingStroke) {
+                                val pt = screenToFrameNorm(change.position)
+                                state.activeDrawingPoints = state.activeDrawingPoints + DrawingPoint(pt.x.coerceIn(0f, 1f), pt.y.coerceIn(0f, 1f))
+                            } else if (state.splitCompare) {
+                                val pt = screenToFrameNorm(change.position)
+                                state.splitPosition = pt.x.coerceIn(0.05f, 0.95f)
                             }
                         },
                         onDragEnd = {
-                            isDraggingBackground = false                            
-                            val points = state.activeDrawingPoints
-                            state.activeDrawingPoints = emptyList()
-                            if (points.size >= 2) {
-                                val currentStyle = when (state.activeTool) {
-                                    EditorTool.DRAW_GLOW -> DoodleStyle.NEON_GLOW
-                                    EditorTool.DRAW_CHALK -> DoodleStyle.SKETCH_CHALK
-                                    EditorTool.DRAW_DASHED -> DoodleStyle.DASHED_TRAIL
-                                    EditorTool.DRAW_PEN -> state.doodleStyle
-                                    else -> DoodleStyle.SOLID_PEN
+                            isDraggingBackground = false
+                            isErasingStroke = false
+
+                            // ONLY commit a stroke if we were actively drawing with a pen/brush tool
+                            if (isDrawingStroke && state.activeTool != EditorTool.ERASER) {
+                                val points = state.activeDrawingPoints
+                                state.activeDrawingPoints = emptyList()
+                                isDrawingStroke = false
+
+                                if (points.size >= 2) {
+                                    val currentStyle = when (state.activeTool) {
+                                        EditorTool.DRAW_GLOW -> DoodleStyle.NEON_GLOW
+                                        EditorTool.DRAW_CHALK -> DoodleStyle.SKETCH_CHALK
+                                        EditorTool.DRAW_DASHED -> DoodleStyle.DASHED_TRAIL
+                                        EditorTool.DRAW_PEN -> state.doodleStyle
+                                        else -> DoodleStyle.SOLID_PEN
+                                    }
+                                    val stroke = DrawingStroke(
+                                        points = points,
+                                        colorHex = if (state.activeTool == EditorTool.RIG_REMOVAL) "#00000000" else state.brushColor.toHexArgb(),
+                                        strokeWidth = state.brushSize,
+                                        isGlow = currentStyle == DoodleStyle.NEON_GLOW,
+                                        isRigRemoval = state.activeTool == EditorTool.RIG_REMOVAL,
+                                        style = currentStyle
+                                    )
+                                    state.addDrawingStroke(stroke)
                                 }
-                                val stroke = DrawingStroke(
-                                    points = points,
-                                    colorHex = if (state.activeTool == EditorTool.RIG_REMOVAL) "#00000000" else state.brushColor.toHexArgb(),
-                                    strokeWidth = state.brushSize,
-                                    isGlow = currentStyle == DoodleStyle.NEON_GLOW,
-                                    isRigRemoval = state.activeTool == EditorTool.RIG_REMOVAL,
-                                    style = currentStyle
-                                )
-                                state.addDrawingStroke(stroke)
+                            } else {
+                                isDrawingStroke = false
+                                state.activeDrawingPoints = emptyList()
                             }
-                          
                         }
                     )
                 }
@@ -284,7 +284,6 @@ fun StopMotionCanvas(state: EditorState) {
             val centerY = viewportH / 2f
             val frameSize = Size(baseW, baseH)
 
-            // Everything inside this block renders strictly into the transformed frame space
             withTransform({
                 translate(left = centerX + state.panOffsetX, top = centerY + state.panOffsetY)
                 scale(scaleX = state.zoomScale, scaleY = state.zoomScale, pivot = Offset.Zero)
@@ -293,9 +292,7 @@ fun StopMotionCanvas(state: EditorState) {
                 // Background dark stage
                 drawRect(color = Color.Black, topLeft = Offset.Zero, size = frameSize)
 
-                // -------------------------------------------------------------
-                // LAYER 1: CURRENT FRAME BASE PHOTO (Opaque at 1.0f alpha)
-                // -------------------------------------------------------------
+                // LAYER 1: CURRENT FRAME BASE PHOTO
                 if (currFrame != null) {
                     if (state.differenceMode && currIdx > 0) {
                         val prevFrame = state.project.frames[currIdx - 1]
@@ -324,7 +321,6 @@ fun StopMotionCanvas(state: EditorState) {
                             strokeWidth = 2.5f / state.zoomScale
                         )
                     } else {
-                        // Draw current stage photo (without drawings baked in)
                         val currentBaseImg = ImageProcessor.processFrame(currFrame, cleanPlateImg, includeDrawings = false)
                             ?: ImageCache.getBufferedImage(currFrame.imagePath)
                         if (currentBaseImg != null) {
@@ -333,9 +329,7 @@ fun StopMotionCanvas(state: EditorState) {
                     }
                 }
 
-                // -------------------------------------------------------------
-                // LAYER 2: ONION SKIN — PAST FRAMES (Drawn ON TOP of current photo)
-                // -------------------------------------------------------------
+                // LAYER 2: ONION SKIN — PAST FRAMES
                 if (state.onionSkinEnabled && !state.isPlaying && state.onionSkinPastCount > 0) {
                     for (p in state.onionSkinPastCount downTo 1) {
                         val pastIdx = currIdx - p
@@ -343,7 +337,6 @@ fun StopMotionCanvas(state: EditorState) {
                             val pastFrame = state.project.frames[pastIdx]
                             val alpha = (state.onionSkinOpacity / p).coerceIn(0.08f, 0.85f)
 
-                            // 2a. Ghost past frame photo (unless "Doodles Only" mode is on)
                             if (!state.doodleOnionSkinOnly) {
                                 val pastBaseImg = ImageProcessor.processFrame(pastFrame, cleanPlateImg, includeDrawings = false)
                                     ?: ImageCache.getBufferedImage(pastFrame.imagePath)
@@ -357,7 +350,6 @@ fun StopMotionCanvas(state: EditorState) {
                                 }
                             }
 
-                            // 2b. Ghost past drawings (sharply rendered in red/pink)
                             for (stroke in pastFrame.drawings) {
                                 val ghostColor = if (state.onionTintMode == OnionTintMode.RED_GREEN_TINT) {
                                     OnionSkinPastColor.copy(alpha = alpha)
@@ -383,9 +375,7 @@ fun StopMotionCanvas(state: EditorState) {
                     }
                 }
 
-                // -------------------------------------------------------------
-                // LAYER 3: ONION SKIN — FUTURE FRAMES (Drawn ON TOP of current photo)
-                // -------------------------------------------------------------
+                // LAYER 3: ONION SKIN — FUTURE FRAMES
                 if (state.onionSkinEnabled && !state.isPlaying && state.onionSkinFutureCount > 0) {
                     for (f in state.onionSkinFutureCount downTo 1) {
                         val futureIdx = currIdx + f
@@ -393,7 +383,6 @@ fun StopMotionCanvas(state: EditorState) {
                             val futureFrame = state.project.frames[futureIdx]
                             val alpha = (state.onionSkinOpacity / f).coerceIn(0.08f, 0.85f)
 
-                            // 3a. Ghost future frame photo (unless "Doodles Only" mode is on)
                             if (!state.doodleOnionSkinOnly) {
                                 val futureBaseImg = ImageProcessor.processFrame(futureFrame, cleanPlateImg, includeDrawings = false)
                                     ?: ImageCache.getBufferedImage(futureFrame.imagePath)
@@ -407,7 +396,6 @@ fun StopMotionCanvas(state: EditorState) {
                                 }
                             }
 
-                            // 3b. Ghost future drawings (sharply rendered in green/mint)
                             for (stroke in futureFrame.drawings) {
                                 val ghostColor = if (state.onionTintMode == OnionTintMode.RED_GREEN_TINT) {
                                     OnionSkinFutureColor.copy(alpha = alpha)
@@ -433,9 +421,7 @@ fun StopMotionCanvas(state: EditorState) {
                     }
                 }
 
-                // -------------------------------------------------------------
-                // LAYER 4: CURRENT FRAME DRAWINGS (100% Full Opacity & True Colors)
-                // -------------------------------------------------------------
+                // LAYER 4: CURRENT FRAME DRAWINGS
                 if (currFrame != null) {
                     for (stroke in currFrame.drawings) {
                         with(DoodleRenderer) {
@@ -450,10 +436,8 @@ fun StopMotionCanvas(state: EditorState) {
                     }
                 }
 
-                // -------------------------------------------------------------
-                // LAYER 5: LIVE IN-PROGRESS DRAWING STROKE
-                // -------------------------------------------------------------
-                if (state.activeDrawingPoints.size >= 2) {
+                // LAYER 5: LIVE IN-PROGRESS DRAWING STROKE (Never shown if ERASER is active)
+                if (state.activeTool != EditorTool.ERASER && state.activeDrawingPoints.size >= 2) {
                     val currentStyle = when (state.activeTool) {
                         EditorTool.DRAW_GLOW -> DoodleStyle.NEON_GLOW
                         EditorTool.DRAW_CHALK -> DoodleStyle.SKETCH_CHALK
@@ -476,9 +460,7 @@ fun StopMotionCanvas(state: EditorState) {
                     }
                 }
 
-                // -------------------------------------------------------------
                 // LAYER 6: GUIDES & FRAME BORDER
-                // -------------------------------------------------------------
                 if (state.showGrid) drawGridGuides(frameSize)
                 if (state.showSafeZone) drawSafeActionMargins(frameSize)
                 if (state.showCenterCross) drawCenterCrosshair(frameSize)
@@ -491,7 +473,7 @@ fun StopMotionCanvas(state: EditorState) {
                 )
             }
 
-            // 7. Live Cursor Ring (Rendered in screen space)
+            // LAYER 7: LIVE CURSOR RING
             if (!isPanningActive && !isDraggingBackground) {
                 hoverCursorPos?.let { pos ->
                     val frameScale = (baseW / 800f).coerceAtLeast(0.5f) * state.zoomScale
@@ -511,6 +493,8 @@ fun StopMotionCanvas(state: EditorState) {
         }
     }
 }
+
+
 
 @Composable
 fun ZoomControlsHUD(state: EditorState, modifier: Modifier = Modifier) {

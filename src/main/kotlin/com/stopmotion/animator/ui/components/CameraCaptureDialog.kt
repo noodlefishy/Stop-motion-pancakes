@@ -20,7 +20,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import com.stopmotion.animator.capture.CameraManager
 import com.stopmotion.animator.capture.CameraStreamer
 import com.stopmotion.animator.state.EditorState
@@ -42,27 +41,25 @@ fun CameraCaptureDialog(state: EditorState) {
     var cameraDropdownOpen by remember { mutableStateOf(false) }
     var isRefreshingCameras by remember { mutableStateOf(false) }
 
-    // Live video feed from camera
     var livePreviewFrame by remember { mutableStateOf<ImageBitmap?>(null) }
-
-    // Resolution options
     var selectedResolution by remember { mutableStateOf("1920x1080") }
     var resolutionDropdownOpen by remember { mutableStateOf(false) }
 
-    // Capture state
     var isCapturing by remember { mutableStateOf(false) }
     var countdownValue by remember { mutableStateOf<Int?>(null) }
     var intervalometerActive by remember { mutableStateOf(false) }
     var intervalSeconds by remember { mutableStateOf(5) }
 
-    // Viewfinder Onion Skin
     var viewfinderOnionSkin by remember { mutableStateOf(true) }
     var viewfinderOnionOpacity by remember { mutableStateOf(0.40f) }
 
-    // Start live stream whenever camera is selected
     fun restartStream(deviceId: String) {
         livePreviewFrame = null
-        streamer.start(deviceId, coroutineScope) { frame ->
+        streamer.start(
+            deviceId = deviceId,
+            captureRes = selectedResolution,
+            scope = coroutineScope
+        ) { frame ->
             livePreviewFrame = frame
         }
     }
@@ -93,50 +90,26 @@ fun CameraCaptureDialog(state: EditorState) {
     fun triggerSnap() {
         if (isCapturing) return
         isCapturing = true
-        coroutineScope.launch {
-            try {
-                // 1. Stop the live stream to release the AVFoundation device lock
-                streamer.stop()
-                delay(250) // Allow macOS / Continuity Camera session to release cleanly
-
-                val captureDir = File(System.getProperty("user.home"), ".stopmotion_animator/captures")
-                captureDir.mkdirs()
-                val destFile = File(captureDir, "capture_${System.currentTimeMillis()}.png")
-
-                // 2. Take the high-res still frame with exclusive camera access
-                val success = CameraManager.captureFrame(
-                    deviceId = selectedCameraId,
-                    destinationFile = destFile,
-                    resolution = selectedResolution
-                )
-
-                if (success) {
-                    state.addImportedImages(listOf(destFile))
-                    state.showToast("Captured frame added to timeline! (${selectedResolution})")
-                } else {
-                    state.showToast("Capture failed. Check camera connection.")
-                }
-            } finally {
-                // 3. Reconnect the live preview stream cleanly
-                restartStream(selectedCameraId)
-                isCapturing = false
-            }
-        }
-    }      
-    if (isCapturing) return
-    isCapturing = true
-    coroutineScope.launch {
+        // Blank the preview while the camera is temporarily stopped for the hi-res grab
+        livePreviewFrame = null
         val captureDir = File(System.getProperty("user.home"), ".stopmotion_animator/captures")
         captureDir.mkdirs()
         val destFile = File(captureDir, "capture_${System.currentTimeMillis()}.png")
-        val success = CameraManager.captureFrame(selectedCameraId, destFile, resolution = selectedResolution)
-        isCapturing = false
 
-        if (success) {
-            state.addImportedImages(listOf(destFile))
-            state.showToast("Captured frame added to timeline! (${selectedResolution})")
-        } else {
-            state.showToast("Capture failed. Ensure camera permissions are granted.")
+        // snapHighRes stops the preview stream, captures a full-res still,
+        // then invokes restartPreview so the live feed comes back.
+        streamer.snapHighRes(
+            destFile = destFile,
+            scope = coroutineScope,
+            restartPreview = { restartStream(selectedCameraId) }
+        ) { success ->
+            isCapturing = false
+            if (success) {
+                state.addImportedImages(listOf(destFile))
+                state.showToast("Captured frame added to timeline! ($selectedResolution)")
+            } else {
+                state.showToast("Capture failed. Ensure camera is connected.")
+            }
         }
     }
 
@@ -154,23 +127,25 @@ fun CameraCaptureDialog(state: EditorState) {
     }
 
     DisposableEffect(Unit) {
-        state.onCameraSnapRequested = {
-            triggerSnap()
-        }
+        state.onCameraSnapRequested = { triggerSnap() }
         onDispose {
             streamer.stop()
             state.onCameraSnapRequested = null
         }
     }
 
-    Dialog(onDismissRequest = {
-        streamer.stop()
-        state.isCameraCaptureDialogVisible = false
-    }) {
+    // IN-APP MODAL OVERLAY (Never drops behind the main window, never auto-dismisses on focus change)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.65f))
+            .clickable(onClick = { /* Intercept clicks so background doesn't trigger */ }),
+        contentAlignment = Alignment.Center
+    ) {
         Surface(
             modifier = Modifier
-                .width(660.dp)
-                .heightIn(max = 620.dp)
+                .width(680.dp)
+                .wrapContentHeight()
                 .border(1.dp, StudioBorder, RoundedCornerShape(12.dp)),
             shape = RoundedCornerShape(12.dp),
             color = StudioSurface
@@ -181,7 +156,7 @@ fun CameraCaptureDialog(state: EditorState) {
                     .padding(18.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // 1. Header Row
+                // Header Row
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -192,12 +167,6 @@ fun CameraCaptureDialog(state: EditorState) {
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Icon(Icons.Default.Videocam, null, tint = StudioAccent, modifier = Modifier.size(22.dp))
-                        Text(
-                            "Stop Motion Pancake — Camera Studio",
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = StudioTextPrimary
-                        )
                         Text(
                             "Stop Motion Pancake — Camera Studio",
                             fontSize = 15.sp,
@@ -217,7 +186,7 @@ fun CameraCaptureDialog(state: EditorState) {
                     }
                 }
 
-                // 2. Camera Device Selector Row (Fixed height 40dp to prevent UI expansion)
+                // Camera Device Selector
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -270,35 +239,9 @@ fun CameraCaptureDialog(state: EditorState) {
                                         color = if (currentCam?.isContinuity == true) StudioAccent else StudioTextPrimary,
                                         maxLines = 1
                                     )
-
-                                    if (currentCam?.isContinuity == true) {
-                                        Surface(
-                                            color = StudioAccent.copy(alpha = 0.2f),
-                                            shape = RoundedCornerShape(4.dp)
-                                        ) {
-                                            Text(
-                                                "Continuity",
-                                                fontSize = 9.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = StudioAccent,
-                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                                            )
-                                        }
-                                    }
                                 }
 
-                                Icon(
-                                    Icons.Default.ArrowDropDown,
-                                    null,
-                                    tint = StudioTextSecondary,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Icon(
-                                    Icons.Default.ArrowDropDown,
-                                    null,
-                                    tint = StudioTextSecondary,
-                                    modifier = Modifier.size(16.dp)
-                                )
+                                Icon(Icons.Default.ArrowDropDown, null, tint = StudioTextSecondary, modifier = Modifier.size(16.dp))
                             }
                         }
 
@@ -309,23 +252,10 @@ fun CameraCaptureDialog(state: EditorState) {
                             cameras.forEach { cam ->
                                 DropdownMenuItem(
                                     text = {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            Icon(
-                                                if (cam.isContinuity) Icons.Default.PhoneIphone else Icons.Default.Videocam,
-                                                null,
-                                                tint = if (cam.isContinuity) StudioAccent else StudioTextSecondary,
-                                                modifier = Modifier.size(16.dp)
-                                            )
-                                            Text(
-                                                cam.name + if (cam.isContinuity) " (Continuity Camera)" else "",
-                                                fontWeight = if (cam.isContinuity) FontWeight.Bold else FontWeight.Normal,
-                                                color = if (cam.isContinuity) StudioAccent else StudioTextPrimary,
-                                                fontSize = 12.sp
-                                            )
-                                        }
+                                        Text(
+                                            cam.name + if (cam.isContinuity) " (Continuity Camera)" else "",
+                                            fontSize = 12.sp
+                                        )
                                     },
                                     onClick = {
                                         selectedCameraId = cam.id
@@ -337,21 +267,7 @@ fun CameraCaptureDialog(state: EditorState) {
                         }
                     }
 
-                    // Refresh Button
-                    IconButton(
-                        onClick = { refreshCameras() },
-                        enabled = !isRefreshingCameras,
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.Refresh,
-                            contentDescription = "Refresh Cameras",
-                            tint = if (isRefreshingCameras) StudioPrimary else StudioTextSecondary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-
-                    // Resolution Dropdown (Fixed height 38dp)
+                    // Resolution Dropdown
                     Box {
                         Surface(
                             color = StudioDark,
@@ -369,30 +285,8 @@ fun CameraCaptureDialog(state: EditorState) {
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Text(
-                                    selectedResolution,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = StudioSecondary
-                                )
-                                Icon(
-                                    Icons.Default.ArrowDropDown,
-                                    null,
-                                    tint = StudioTextSecondary,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                                Text(
-                                    selectedResolution,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = StudioSecondary
-                                )
-                                Icon(
-                                    Icons.Default.ArrowDropDown,
-                                    null,
-                                    tint = StudioTextSecondary,
-                                    modifier = Modifier.size(14.dp)
-                                )
+                                Text(selectedResolution, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = StudioSecondary)
+                                Icon(Icons.Default.ArrowDropDown, null, tint = StudioTextSecondary, modifier = Modifier.size(14.dp))
                             }
                         }
 
@@ -400,16 +294,13 @@ fun CameraCaptureDialog(state: EditorState) {
                             expanded = resolutionDropdownOpen,
                             onDismissRequest = { resolutionDropdownOpen = false }
                         ) {
-                            listOf(
-                                "1920x1080" to "1080p (Full HD - Continuity)",
-                                "1280x720" to "720p (HD)",
-                                "3840x2160" to "4K (Ultra HD)"
-                            ).forEach { (res, label) ->
+                            listOf("1920x1080" to "1080p (Full HD)", "1280x720" to "720p (HD)").forEach { (res, label) ->
                                 DropdownMenuItem(
                                     text = { Text(label, fontSize = 11.sp) },
                                     onClick = {
                                         selectedResolution = res
                                         resolutionDropdownOpen = false
+                                        restartStream(selectedCameraId)
                                     }
                                 )
                             }
@@ -417,11 +308,11 @@ fun CameraCaptureDialog(state: EditorState) {
                     }
                 }
 
-                // 3. Live Camera Viewfinder Box (Height 250dp)
+                // Viewfinder Box
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(250.dp)
+                        .height(300.dp)
                         .clip(RoundedCornerShape(8.dp))
                         .background(Color.Black),
                     contentAlignment = Alignment.Center
@@ -431,7 +322,6 @@ fun CameraCaptureDialog(state: EditorState) {
                         lastFrame?.let { ImageCache.getThumbnail(it.imagePath, 640, 360) }
                     }
 
-                    // REAL LIVE CAMERA STREAM FEED!
                     val liveFrame = livePreviewFrame
                     if (liveFrame != null) {
                         Image(
@@ -441,7 +331,6 @@ fun CameraCaptureDialog(state: EditorState) {
                             modifier = Modifier.fillMaxSize()
                         )
                     } else {
-                        // Connecting standby state
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -455,43 +344,6 @@ fun CameraCaptureDialog(state: EditorState) {
                         }
                     }
 
-                    // Viewfinder Live Badge
-                    Surface(
-                        color = Color.Black.copy(alpha = 0.65f),
-                        shape = RoundedCornerShape(4.dp),
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .padding(8.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier.size(8.dp).clip(CircleShape)
-                                    .background(if (liveFrame != null) StudioAccent else StudioWarning)
-                            )
-                            Text(
-                                if (liveFrame != null) "LIVE FEED" else "CONNECTING",
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                            Box(
-                                modifier = Modifier.size(8.dp).clip(CircleShape)
-                                    .background(if (liveFrame != null) StudioAccent else StudioWarning)
-                            )
-                            Text(
-                                if (liveFrame != null) "LIVE FEED" else "CONNECTING",
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                        }
-                    }
-
-                    // Ghosted Onion Skin of Previous Frame
                     if (viewfinderOnionSkin && lastFrameThumb != null) {
                         Image(
                             bitmap = lastFrameThumb,
@@ -502,7 +354,6 @@ fun CameraCaptureDialog(state: EditorState) {
                         )
                     }
 
-                    // Countdown Timer Overlay
                     countdownValue?.let { count ->
                         Box(
                             modifier = Modifier
@@ -516,13 +367,12 @@ fun CameraCaptureDialog(state: EditorState) {
                     }
                 }
 
-                // 4. Viewfinder Guides & Timer Controls Row
+                // Viewfinder Controls
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Left: Onion skin toggle and slider
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -530,23 +380,11 @@ fun CameraCaptureDialog(state: EditorState) {
                         FilterChip(
                             selected = viewfinderOnionSkin,
                             onClick = { viewfinderOnionSkin = !viewfinderOnionSkin },
-                            label = { Text("Ghost Previous", fontSize = 11.sp) },
-                            leadingIcon = {
-                                Icon(Icons.Default.Layers, null, modifier = Modifier.size(14.dp))
-                            }
+                            label = { Text("Ghost Previous", fontSize = 11.sp) }
                         )
 
                         if (viewfinderOnionSkin) {
-                            Text(
-                                "${(viewfinderOnionOpacity * 100).toInt()}%",
-                                fontSize = 10.sp,
-                                color = StudioTextSecondary
-                            )
-                            Text(
-                                "${(viewfinderOnionOpacity * 100).toInt()}%",
-                                fontSize = 10.sp,
-                                color = StudioTextSecondary
-                            )
+                            Text("${(viewfinderOnionOpacity * 100).toInt()}%", fontSize = 10.sp, color = StudioTextSecondary)
                             Slider(
                                 value = viewfinderOnionOpacity,
                                 onValueChange = { viewfinderOnionOpacity = it },
@@ -556,7 +394,6 @@ fun CameraCaptureDialog(state: EditorState) {
                         }
                     }
 
-                    // Right: 3s Timer and Timelapse
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -564,8 +401,7 @@ fun CameraCaptureDialog(state: EditorState) {
                         OutlinedButton(
                             onClick = { startCountdownSnap() },
                             enabled = !isCapturing && countdownValue == null,
-                            shape = RoundedCornerShape(6.dp),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                            shape = RoundedCornerShape(6.dp)
                         ) {
                             Icon(Icons.Default.Timer, null, modifier = Modifier.size(14.dp))
                             Spacer(Modifier.width(4.dp))
@@ -590,11 +426,9 @@ fun CameraCaptureDialog(state: EditorState) {
                     }
                 }
 
-                // 5. Bottom Action Bar: Prominent SNAP FRAME button (Guaranteed visible)
+                // SNAP FRAME Button
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 4.dp),
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {

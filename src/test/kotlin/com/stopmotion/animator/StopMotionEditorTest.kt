@@ -178,7 +178,7 @@ class StopMotionEditorTest {
     @Test
     fun testCameraSnapCallbackTrigger() {
         var snapTriggered = false
-        val state = com.stopmotion.animator.state.EditorState()
+        val state = com.stopmotion.animator.state.EditorState(skipInit = true)
         state.onCameraSnapRequested = {
             snapTriggered = true
         }
@@ -189,9 +189,10 @@ class StopMotionEditorTest {
 
     @Test
     fun testPassiveProjectSave() {
-        val state = com.stopmotion.animator.state.EditorState()
+        val state = com.stopmotion.animator.state.EditorState(skipInit = true)
         val tempFile = File.createTempFile("pancake_test", ".smproj")
         tempFile.deleteOnExit()
+
 
         var promptCalled = false
         // When unsaved (currentProjectFile == null), it should invoke the prompt callback
@@ -220,7 +221,7 @@ class StopMotionEditorTest {
 
     @Test
     fun testLastOpenedProjectPersistence() {
-        val state = com.stopmotion.animator.state.EditorState()
+        val state = com.stopmotion.animator.state.EditorState(skipInit = true)
         val tempFile = File.createTempFile("pancake_last_opened", ".smproj")
         tempFile.deleteOnExit()
 

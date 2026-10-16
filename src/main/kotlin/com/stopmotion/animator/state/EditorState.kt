@@ -12,7 +12,11 @@ import com.stopmotion.animator.util.ImageProcessor
 import kotlinx.coroutines.*
 import kotlinx.serialization.json.Json
 import java.io.File
-class EditorState(val scope: CoroutineScope = CoroutineScope(Dispatchers.Default)) {
+class EditorState(
+    val scope: CoroutineScope = CoroutineScope(Dispatchers.Default),
+    skipInit: Boolean = false
+) {
+
 
     val audioEngine = AudioEngine()
 
@@ -87,17 +91,19 @@ class EditorState(val scope: CoroutineScope = CoroutineScope(Dispatchers.Default
 
     init {
         // Automatically load last opened project on startup, or fallback to demo
-        scope.launch {
-            val lastPath = settings.lastOpenedProjectPath
-            val lastFile = if (!lastPath.isNullOrBlank()) File(lastPath) else null
-            if (lastFile != null && lastFile.exists() && lastFile.isFile) {
-                try {
-                    loadProjectFromJson(lastFile)
-                } catch (e: Exception) {
+        if (!skipInit) {
+            scope.launch {
+                val lastPath = settings.lastOpenedProjectPath
+                val lastFile = if (!lastPath.isNullOrBlank()) File(lastPath) else null
+                if (lastFile != null && lastFile.exists() && lastFile.isFile) {
+                    try {
+                        loadProjectFromJson(lastFile)
+                    } catch (e: Exception) {
+                        loadDemo()
+                    }
+                } else {
                     loadDemo()
                 }
-            } else {
-                loadDemo()
             }
         }
     }

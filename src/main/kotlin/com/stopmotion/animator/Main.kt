@@ -332,6 +332,9 @@ onKeyEvent = { keyEvent ->
                 CheckboxItem("Onion Skinning", checked = editorState.onionSkinEnabled, shortcut = KeyShortcut(Key.O)) {
                     editorState.onionSkinEnabled = !editorState.onionSkinEnabled
                 }
+                CheckboxItem("Onion Skin: Doodles Only", checked = editorState.doodleOnionSkinOnly) {
+                    editorState.doodleOnionSkinOnly = !editorState.doodleOnionSkinOnly
+                }
                 CheckboxItem("Rule of Thirds Grid", checked = editorState.showGrid) { editorState.showGrid = !editorState.showGrid }
                 CheckboxItem("Safe Action Margins", checked = editorState.showSafeZone) { editorState.showSafeZone = !editorState.showSafeZone }
                 CheckboxItem("Split Screen Compare", checked = editorState.splitCompare) { editorState.splitCompare = !editorState.splitCompare }

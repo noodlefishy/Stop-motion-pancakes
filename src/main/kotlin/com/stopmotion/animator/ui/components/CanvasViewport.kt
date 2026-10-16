@@ -1,5 +1,6 @@
 package com.stopmotion.animator.ui.components
 
+import com.stopmotion.animator.util.DoodleRenderer
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -16,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
@@ -85,64 +87,51 @@ fun CanvasViewport(state: EditorState, modifier: Modifier = Modifier) {
 fun StopMotionCanvas(state: EditorState) {
     var activePoints by remember { mutableStateOf(listOf<DrawingPoint>()) }
     var hoverCursorPos by remember { mutableStateOf<Offset?>(null) }
+    var isDraggingBackground by remember { mutableStateOf(false) }
 
-    BoxWithConstraints(
+    val currFrame = state.currentFrame
+    val currIdx = state.selectedFrameIndex
+
+    val cleanPlateImg = remember(state.project.cleanPlateFrameId, state.project.frames) {
+        state.project.cleanPlateFrameId?.let { id ->
+            state.project.frames.find { it.id == id }?.let { frame ->
+                ImageCache.getBufferedImage(frame.imagePath)
+            }
+        }
+    }
+
+    val isPanningActive = state.isSpaceHeld || state.activeTool == EditorTool.HAND
+
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .clip(RoundedCornerShape(8.dp))
-            .background(Color.Black),
-        contentAlignment = Alignment.Center
+            .background(Color(0xFF07090C))
+            .clipToBounds()
     ) {
-        val targetAspect = state.project.aspectRatio.ratio
-        val boxWidth = maxWidth.value
-        val boxHeight = maxHeight.value
-
-        val (canvasW, canvasH) = if (boxWidth / boxHeight > targetAspect) {
-            Pair(boxHeight * targetAspect, boxHeight)
-        } else {
-            Pair(boxWidth, boxWidth / targetAspect)
-        }
-
-        val currFrame = state.currentFrame
-        val currIdx = state.selectedFrameIndex
-
-        val cleanPlateImg = remember(state.project.cleanPlateFrameId, state.project.frames) {
-            state.project.cleanPlateFrameId?.let { id ->
-                state.project.frames.find { it.id == id }?.let { frame ->
-                    ImageCache.getBufferedImage(frame.imagePath)
-                }
-            }
-        }
-
-        fun screenToNorm(screenPos: Offset, w: Float, h: Float): DrawingPoint {
-            val cx = w / 2f
-            val cy = h / 2f
-            val normX = (0.5f + (screenPos.x - cx - state.panOffsetX) / (w * state.zoomScale)).coerceIn(0f, 1f)
-            val normY = (0.5f + (screenPos.y - cy - state.panOffsetY) / (h * state.zoomScale)).coerceIn(0f, 1f)
-            return DrawingPoint(normX, normY)
-        }
-
-        val isPanningActive = state.isSpaceHeld || state.activeTool == EditorTool.HAND
-
         Canvas(
             modifier = Modifier
-                .size(canvasW.dp, canvasH.dp)
-                .pointerHoverIcon(if (isPanningActive) PointerIcon.Hand else PointerIcon.Default)
-                // 1. Two-finger trackpad / mouse scroll pan & Cmd+Scroll zoom
+                .fillMaxSize()
+                .pointerHoverIcon(if (isPanningActive || isDraggingBackground) PointerIcon.Hand else PointerIcon.Default)
+                // 1. Hover tracking across the entire screen
+                .onPointerEvent(PointerEventType.Move) { event ->
+                    hoverCursorPos = event.changes.firstOrNull()?.position
+                }
+                .onPointerEvent(PointerEventType.Exit) {
+                    hoverCursorPos = null
+                }
+                // 2. Trackpad two-finger scroll pan and Cmd/Ctrl + Scroll zoom
                 .onPointerEvent(PointerEventType.Scroll) { event ->
                     val change = event.changes.firstOrNull() ?: return@onPointerEvent
                     val delta = change.scrollDelta
                     if (event.keyboardModifiers.isMetaPressed || event.keyboardModifiers.isCtrlPressed) {
                         if (delta.y < 0) state.zoomIn() else if (delta.y > 0) state.zoomOut()
                     } else {
-                        // Smooth two-finger / scroll panning
-                        val maxPanX = (canvasW * state.zoomScale) * 0.85f
-                        val maxPanY = (canvasH * state.zoomScale) * 0.85f
-                        state.panOffsetX = (state.panOffsetX - delta.x * 22f).coerceIn(-maxPanX, maxPanX)
-                        state.panOffsetY = (state.panOffsetY - delta.y * 22f).coerceIn(-maxPanY, maxPanY)
+                        state.panOffsetX -= delta.x * 24f
+                        state.panOffsetY -= delta.y * 24f
                     }
                 }
-                // 2. Drag gestures (Drawing, Erasing, and Pan)
+                // 3. Gestures: Drawing, Erasing, and Panning with full screen coverage
                 .pointerInput(
                     state.activeTool,
                     state.selectedFrameIndex,
@@ -152,207 +141,368 @@ fun StopMotionCanvas(state: EditorState) {
                     state.zoomScale,
                     state.panOffsetX,
                     state.panOffsetY,
-                    state.isSpaceHeld
+                    state.isSpaceHeld,
+                    state.project.aspectRatio
                 ) {
-                    val w = size.width.toFloat()
-                    val h = size.height.toFloat()
+                    val viewportW = size.width.toFloat()
+                    val viewportH = size.height.toFloat()
+                    val targetAspect = state.project.aspectRatio.ratio
 
-                    // If Spacebar is held OR Hand tool is active OR Select tool is active: PAN
-                    if (state.isSpaceHeld || state.activeTool == EditorTool.HAND || state.activeTool == EditorTool.SELECT) {
-                        detectDragGestures(
-                            onDragStart = {
+                    // Compute base frame dimensions that fit inside viewport at 1x zoom
+                    val baseW: Float
+                    val baseH: Float
+                    if (viewportW / viewportH > targetAspect) {
+                        baseH = viewportH * 0.95f
+                        baseW = baseH * targetAspect
+                    } else {
+                        baseW = viewportW * 0.95f
+                        baseH = baseW / targetAspect
+                    }
+
+                    val centerX = viewportW / 2f
+                    val centerY = viewportH / 2f
+
+                    // Inverse coordinate projection: screen (x, y) -> frame normalized (0..1)
+                    fun screenToFrameNorm(pos: Offset): DrawingPoint {
+                        val frameW = baseW * state.zoomScale
+                        val frameH = baseH * state.zoomScale
+                        val nx = 0.5f + (pos.x - centerX - state.panOffsetX) / frameW
+                        val ny = 0.5f + (pos.y - centerY - state.panOffsetY) / frameH
+                        return DrawingPoint(nx, ny)
+                    }
+
+                    detectDragGestures(
+                        onDragStart = { startPos ->
+                            hoverCursorPos = startPos
+                            val pt = screenToFrameNorm(startPos)
+                            val isInsideFrame = pt.x in 0f..1f && pt.y in 0f..1f
+                            
+                            state.activeDrawingPoints = listOf(DrawingPoint(pt.x.coerceIn(0f, 1f), pt.y.coerceIn(0f, 1f)))
+                            
+                            if (isPanningActive || state.activeTool == EditorTool.SELECT || !isInsideFrame) {
+                                // User clicked outside the frame or has hand/space tool active -> Pan
+                                isDraggingBackground = true
                                 state.wasPanDragTriggered = true
-                            },
-                            onDrag = { _, dragAmount ->
+                            } else if (state.activeTool == EditorTool.ERASER) {
+                                state.eraseStrokesNear(
+                                    normX = pt.x,
+                                    normY = pt.y,
+                                    canvasWidth = baseW,
+                                    canvasHeight = baseH,
+                                    radiusPixels = state.brushSize * 1.5f * (baseW / 800f).coerceAtLeast(0.5f)
+                                )
+                            } else if (state.activeTool in listOf(
+                                    EditorTool.DRAW_PEN,
+                                    EditorTool.DRAW_GLOW,
+                                    EditorTool.DRAW_CHALK,
+                                    EditorTool.DRAW_DASHED,
+                                    EditorTool.RIG_REMOVAL
+                                )
+                            ) {
+                                activePoints = listOf(DrawingPoint(pt.x.coerceIn(0f, 1f), pt.y.coerceIn(0f, 1f)))
+                            }
+                        },
+                        onDrag = { change, dragAmount ->
+                            hoverCursorPos = change.position
+                            val pt = screenToFrameNorm(change.position)
+                            state.activeDrawingPoints += DrawingPoint(pt.x.coerceIn(0f, 1f), pt.y.coerceIn(0f, 1f))
+                            
+                            
+                            if (isDraggingBackground || isPanningActive || state.activeTool == EditorTool.SELECT) {
                                 state.wasPanDragTriggered = true
-                                val maxPanX = (w * state.zoomScale) * 0.85f
-                                val maxPanY = (h * state.zoomScale) * 0.85f
+                                val maxPanX = (viewportW + baseW * state.zoomScale) * 0.75f
+                                val maxPanY = (viewportH + baseH * state.zoomScale) * 0.75f
                                 state.panOffsetX = (state.panOffsetX + dragAmount.x).coerceIn(-maxPanX, maxPanX)
                                 state.panOffsetY = (state.panOffsetY + dragAmount.y).coerceIn(-maxPanY, maxPanY)
-                            }
-                        )
-                    } else if (state.activeTool == EditorTool.ERASER) {
-                        detectDragGestures(
-                            onDragStart = { offset ->
-                                hoverCursorPos = offset
-                                val pt = screenToNorm(offset, w, h)
-                                state.eraseStrokesNear(pt.x, pt.y, w, h, radiusPixels = state.brushSize * 1.5f)
-                            },
-                            onDrag = { change, _ ->
-                                hoverCursorPos = change.position
-                                val pt = screenToNorm(change.position, w, h)
-                                state.eraseStrokesNear(pt.x, pt.y, w, h, radiusPixels = state.brushSize * 1.5f)
-                            },
-                            onDragEnd = { hoverCursorPos = null }
-                        )
-                    } else if (state.activeTool in listOf(
-                            EditorTool.DRAW_PEN,
-                            EditorTool.DRAW_GLOW,
-                            EditorTool.DRAW_CHALK,
-                            EditorTool.DRAW_DASHED,
-                            EditorTool.RIG_REMOVAL
-                        )
-                    ) {
-                        detectDragGestures(
-                            onDragStart = { offset ->
-                                hoverCursorPos = offset
-                                activePoints = listOf(screenToNorm(offset, w, h))
-                            },
-                            onDrag = { change, _ ->
-                                hoverCursorPos = change.position
-                                activePoints = activePoints + screenToNorm(change.position, w, h)
-                            },
-                            onDragEnd = {
-                                hoverCursorPos = null
-                                if (activePoints.size >= 2) {
-                                    val currentStyle = when (state.activeTool) {
-                                        EditorTool.DRAW_GLOW -> DoodleStyle.NEON_GLOW
-                                        EditorTool.DRAW_CHALK -> DoodleStyle.SKETCH_CHALK
-                                        EditorTool.DRAW_DASHED -> DoodleStyle.DASHED_TRAIL
-                                        EditorTool.DRAW_PEN -> state.doodleStyle
-                                        else -> DoodleStyle.SOLID_PEN
-                                    }
-                                    val stroke = DrawingStroke(
-                                        points = activePoints,
-                                        colorHex = if (state.activeTool == EditorTool.RIG_REMOVAL) "#00000000" else state.brushColor.toHexArgb(),
-                                        strokeWidth = state.brushSize,
-                                        isGlow = currentStyle == DoodleStyle.NEON_GLOW,
-                                        isRigRemoval = state.activeTool == EditorTool.RIG_REMOVAL,
-                                        style = currentStyle
+                            } else {
+                               
+
+                                if (state.activeTool == EditorTool.ERASER) {
+                                    state.eraseStrokesNear(
+                                        normX = pt.x.coerceIn(0f, 1f),
+                                        normY = pt.y.coerceIn(0f, 1f),
+                                        canvasWidth = baseW,
+                                        canvasHeight = baseH,
+                                        radiusPixels = state.brushSize * 1.5f * (baseW / 800f).coerceAtLeast(0.5f)
                                     )
-                                    state.addDrawingStroke(stroke)
+                                } else if (state.activeTool in listOf(
+                                        EditorTool.DRAW_PEN,
+                                        EditorTool.DRAW_GLOW,
+                                        EditorTool.DRAW_CHALK,
+                                        EditorTool.DRAW_DASHED,
+                                        EditorTool.RIG_REMOVAL
+                                    )
+                                ) {
+                                    activePoints = activePoints + DrawingPoint(pt.x.coerceIn(0f, 1f), pt.y.coerceIn(0f, 1f))
+                                } else if (state.splitCompare) {
+                                    state.splitPosition = pt.x.coerceIn(0.05f, 0.95f)
                                 }
-                                activePoints = emptyList()
                             }
+                        },
+                        onDragEnd = {
+                            isDraggingBackground = false                            
+                            val points = state.activeDrawingPoints
+                            state.activeDrawingPoints = emptyList()
+                            if (points.size >= 2) {
+                                val currentStyle = when (state.activeTool) {
+                                    EditorTool.DRAW_GLOW -> DoodleStyle.NEON_GLOW
+                                    EditorTool.DRAW_CHALK -> DoodleStyle.SKETCH_CHALK
+                                    EditorTool.DRAW_DASHED -> DoodleStyle.DASHED_TRAIL
+                                    EditorTool.DRAW_PEN -> state.doodleStyle
+                                    else -> DoodleStyle.SOLID_PEN
+                                }
+                                val stroke = DrawingStroke(
+                                    points = points,
+                                    colorHex = if (state.activeTool == EditorTool.RIG_REMOVAL) "#00000000" else state.brushColor.toHexArgb(),
+                                    strokeWidth = state.brushSize,
+                                    isGlow = currentStyle == DoodleStyle.NEON_GLOW,
+                                    isRigRemoval = state.activeTool == EditorTool.RIG_REMOVAL,
+                                    style = currentStyle
+                                )
+                                state.addDrawingStroke(stroke)
+                            }
+                          
+                        }
+                    )
+                }
+        ) {
+            val viewportW = size.width
+            val viewportH = size.height
+            val targetAspect = state.project.aspectRatio.ratio
+
+            val baseW: Float
+            val baseH: Float
+            if (viewportW / viewportH > targetAspect) {
+                baseH = viewportH * 0.95f
+                baseW = baseH * targetAspect
+            } else {
+                baseW = viewportW * 0.95f
+                baseH = baseW / targetAspect
+            }
+
+            val centerX = viewportW / 2f
+            val centerY = viewportH / 2f
+            val frameSize = Size(baseW, baseH)
+
+            // Everything inside this block renders strictly into the transformed frame space
+            withTransform({
+                translate(left = centerX + state.panOffsetX, top = centerY + state.panOffsetY)
+                scale(scaleX = state.zoomScale, scaleY = state.zoomScale, pivot = Offset.Zero)
+                translate(left = -baseW / 2f, top = -baseH / 2f)
+            }) {
+                // Background dark stage
+                drawRect(color = Color.Black, topLeft = Offset.Zero, size = frameSize)
+
+                // -------------------------------------------------------------
+                // LAYER 1: CURRENT FRAME BASE PHOTO (Opaque at 1.0f alpha)
+                // -------------------------------------------------------------
+                if (currFrame != null) {
+                    if (state.differenceMode && currIdx > 0) {
+                        val prevFrame = state.project.frames[currIdx - 1]
+                        val prevImg = ImageCache.getBufferedImage(prevFrame.imagePath)
+                        val currProcessed = ImageProcessor.processFrame(currFrame, cleanPlateImg)
+                            ?: ImageCache.getBufferedImage(currFrame.imagePath)
+
+                        if (prevImg != null && currProcessed != null) {
+                            val diff = ImageProcessor.computeDifference(currProcessed, prevImg)
+                            drawFrameImage(diff, frameSize, alpha = 1.0f)
+                        }
+                    } else if (state.splitCompare && currIdx > 0) {
+                        val prevFrame = state.project.frames[currIdx - 1]
+                        val prevImg = ImageCache.getBufferedImage(prevFrame.imagePath)
+                        val currProcessed = ImageProcessor.processFrame(currFrame, cleanPlateImg)
+                            ?: ImageCache.getBufferedImage(currFrame.imagePath)
+
+                        if (prevImg != null) drawFrameImage(prevImg, frameSize, alpha = 1.0f)
+                        if (currProcessed != null) drawFrameImage(currProcessed, frameSize, alpha = 1.0f)
+
+                        val splitX = frameSize.width * state.splitPosition
+                        drawLine(
+                            color = StudioPrimary,
+                            start = Offset(splitX, 0f),
+                            end = Offset(splitX, frameSize.height),
+                            strokeWidth = 2.5f / state.zoomScale
                         )
-                    } else if (state.splitCompare) {
-                        detectDragGestures { change, _ ->
-                            state.splitPosition = (change.position.x / size.width).coerceIn(0.05f, 0.95f)
+                    } else {
+                        // Draw current stage photo (without drawings baked in)
+                        val currentBaseImg = ImageProcessor.processFrame(currFrame, cleanPlateImg, includeDrawings = false)
+                            ?: ImageCache.getBufferedImage(currFrame.imagePath)
+                        if (currentBaseImg != null) {
+                            drawFrameImage(currentBaseImg, frameSize, alpha = 1.0f)
                         }
                     }
                 }
-        ) {
-            val canvasSize = size
 
-            withTransform({
-                translate(left = state.panOffsetX, top = state.panOffsetY)
-                scale(
-                    scaleX = state.zoomScale,
-                    scaleY = state.zoomScale,
-                    pivot = Offset(canvasSize.width / 2f, canvasSize.height / 2f)
-                )
-            }) {
-                // 1. Onion Skin (Past)
+                // -------------------------------------------------------------
+                // LAYER 2: ONION SKIN — PAST FRAMES (Drawn ON TOP of current photo)
+                // -------------------------------------------------------------
                 if (state.onionSkinEnabled && !state.isPlaying && state.onionSkinPastCount > 0) {
                     for (p in state.onionSkinPastCount downTo 1) {
                         val pastIdx = currIdx - p
-                        if (pastIdx >= 0 && pastIdx < state.project.frames.size) {
+                        if (pastIdx in state.project.frames.indices) {
                             val pastFrame = state.project.frames[pastIdx]
-                            val pastImg = ImageProcessor.processFrame(pastFrame, cleanPlateImg)
-                                ?: ImageCache.getBufferedImage(pastFrame.imagePath)
-                            pastImg?.let { img ->
-                                val alpha = (state.onionSkinOpacity / p).coerceIn(0.08f, 0.8f)
-                                drawFrameImage(
-                                    img,
-                                    canvasSize,
-                                    alpha = alpha,
-                                    tint = if (state.onionTintMode == OnionTintMode.RED_GREEN_TINT) OnionSkinPastColor else null
-                                )
+                            val alpha = (state.onionSkinOpacity / p).coerceIn(0.08f, 0.85f)
+
+                            // 2a. Ghost past frame photo (unless "Doodles Only" mode is on)
+                            if (!state.doodleOnionSkinOnly) {
+                                val pastBaseImg = ImageProcessor.processFrame(pastFrame, cleanPlateImg, includeDrawings = false)
+                                    ?: ImageCache.getBufferedImage(pastFrame.imagePath)
+                                pastBaseImg?.let { img ->
+                                    drawFrameImage(
+                                        img = img,
+                                        canvasSize = frameSize,
+                                        alpha = alpha * 0.75f,
+                                        tint = if (state.onionTintMode == OnionTintMode.RED_GREEN_TINT) OnionSkinPastColor else null
+                                    )
+                                }
+                            }
+
+                            // 2b. Ghost past drawings (sharply rendered in red/pink)
+                            for (stroke in pastFrame.drawings) {
+                                val ghostColor = if (state.onionTintMode == OnionTintMode.RED_GREEN_TINT) {
+                                    OnionSkinPastColor.copy(alpha = alpha)
+                                } else {
+                                    val awt = ImageProcessor.parseHexColor(stroke.colorHex)
+                                    Color(awt.red, awt.green, awt.blue, (alpha * 255).toInt())
+                                }
+                                with(DoodleRenderer) {
+                                    drawPointsPath(
+                                        points = stroke.points,
+                                        color = ghostColor,
+                                        baseStrokeWidth = stroke.strokeWidth,
+                                        style = stroke.style,
+                                        isGlow = stroke.isGlow,
+                                        originX = 0f,
+                                        originY = 0f,
+                                        width = baseW,
+                                        height = baseH
+                                    )
+                                }
                             }
                         }
                     }
                 }
 
-                // 2. Current Frame
-                if (currFrame != null) {
-                    val processedImg = ImageProcessor.processFrame(currFrame, cleanPlateImg)
-                        ?: ImageCache.getBufferedImage(currFrame.imagePath)
-
-                    if (processedImg != null) {
-                        if (state.differenceMode && currIdx > 0) {
-                            val prevFrame = state.project.frames[currIdx - 1]
-                            val prevImg = ImageCache.getBufferedImage(prevFrame.imagePath)
-                            if (prevImg != null) {
-                                val diff = ImageProcessor.computeDifference(processedImg, prevImg)
-                                drawFrameImage(diff, canvasSize, alpha = 1.0f)
-                            } else {
-                                drawFrameImage(processedImg, canvasSize, alpha = 1.0f)
-                            }
-                        } else if (state.splitCompare && currIdx > 0) {
-                            val prevFrame = state.project.frames[currIdx - 1]
-                            val prevImg = ImageCache.getBufferedImage(prevFrame.imagePath)
-                            val splitX = canvasSize.width * state.splitPosition
-
-                            if (prevImg != null) drawFrameImage(prevImg, canvasSize, alpha = 1.0f)
-                            drawFrameImage(processedImg, canvasSize, alpha = 1.0f)
-
-                            drawLine(
-                                color = StudioPrimary,
-                                start = Offset(splitX, 0f),
-                                end = Offset(splitX, canvasSize.height),
-                                strokeWidth = 2.5f
-                            )
-                        } else {
-                            drawFrameImage(processedImg, canvasSize, alpha = 1.0f)
-                        }
-                    }
-                }
-
-                // 3. Onion Skin (Future)
+                // -------------------------------------------------------------
+                // LAYER 3: ONION SKIN — FUTURE FRAMES (Drawn ON TOP of current photo)
+                // -------------------------------------------------------------
                 if (state.onionSkinEnabled && !state.isPlaying && state.onionSkinFutureCount > 0) {
-                    for (f in 1..state.onionSkinFutureCount) {
+                    for (f in state.onionSkinFutureCount downTo 1) {
                         val futureIdx = currIdx + f
                         if (futureIdx in state.project.frames.indices) {
                             val futureFrame = state.project.frames[futureIdx]
-                            val futureImg = ImageProcessor.processFrame(futureFrame, cleanPlateImg)
-                                ?: ImageCache.getBufferedImage(futureFrame.imagePath)
-                            futureImg?.let { img ->
-                                val alpha = (state.onionSkinOpacity / f).coerceIn(0.08f, 0.8f)
-                                drawFrameImage(
-                                    img,
-                                    canvasSize,
-                                    alpha = alpha,
-                                    tint = if (state.onionTintMode == OnionTintMode.RED_GREEN_TINT) OnionSkinFutureColor else null
-                                )
+                            val alpha = (state.onionSkinOpacity / f).coerceIn(0.08f, 0.85f)
+
+                            // 3a. Ghost future frame photo (unless "Doodles Only" mode is on)
+                            if (!state.doodleOnionSkinOnly) {
+                                val futureBaseImg = ImageProcessor.processFrame(futureFrame, cleanPlateImg, includeDrawings = false)
+                                    ?: ImageCache.getBufferedImage(futureFrame.imagePath)
+                                futureBaseImg?.let { img ->
+                                    drawFrameImage(
+                                        img = img,
+                                        canvasSize = frameSize,
+                                        alpha = alpha * 0.75f,
+                                        tint = if (state.onionTintMode == OnionTintMode.RED_GREEN_TINT) OnionSkinFutureColor else null
+                                    )
+                                }
+                            }
+
+                            // 3b. Ghost future drawings (sharply rendered in green/mint)
+                            for (stroke in futureFrame.drawings) {
+                                val ghostColor = if (state.onionTintMode == OnionTintMode.RED_GREEN_TINT) {
+                                    OnionSkinFutureColor.copy(alpha = alpha)
+                                } else {
+                                    val awt = ImageProcessor.parseHexColor(stroke.colorHex)
+                                    Color(awt.red, awt.green, awt.blue, (alpha * 255).toInt())
+                                }
+                                with(DoodleRenderer) {
+                                    drawPointsPath(
+                                        points = stroke.points,
+                                        color = ghostColor,
+                                        baseStrokeWidth = stroke.strokeWidth,
+                                        style = stroke.style,
+                                        isGlow = stroke.isGlow,
+                                        originX = 0f,
+                                        originY = 0f,
+                                        width = baseW,
+                                        height = baseH
+                                    )
+                                }
                             }
                         }
                     }
                 }
 
-                // 4. In-progress Stroke
-                if (activePoints.size >= 2) {
-                    val strokeColor = if (state.activeTool == EditorTool.RIG_REMOVAL) Color.Cyan.copy(alpha = 0.5f) else state.brushColor
-                    val scaledStrokeWidth = state.brushSize * (canvasSize.width / 800f).coerceAtLeast(1f)
-                    for (i in 0 until activePoints.size - 1) {
-                        val p1 = activePoints[i]
-                        val p2 = activePoints[i + 1]
-                        drawLine(
-                            color = strokeColor,
-                            start = Offset(p1.x * canvasSize.width, p1.y * canvasSize.height),
-                            end = Offset(p2.x * canvasSize.width, p2.y * canvasSize.height),
-                            strokeWidth = scaledStrokeWidth,
-                            cap = StrokeCap.Round
+                // -------------------------------------------------------------
+                // LAYER 4: CURRENT FRAME DRAWINGS (100% Full Opacity & True Colors)
+                // -------------------------------------------------------------
+                if (currFrame != null) {
+                    for (stroke in currFrame.drawings) {
+                        with(DoodleRenderer) {
+                            drawStroke(
+                                stroke = stroke,
+                                originX = 0f,
+                                originY = 0f,
+                                width = baseW,
+                                height = baseH
+                            )
+                        }
+                    }
+                }
+
+                // -------------------------------------------------------------
+                // LAYER 5: LIVE IN-PROGRESS DRAWING STROKE
+                // -------------------------------------------------------------
+                if (state.activeDrawingPoints.size >= 2) {
+                    val currentStyle = when (state.activeTool) {
+                        EditorTool.DRAW_GLOW -> DoodleStyle.NEON_GLOW
+                        EditorTool.DRAW_CHALK -> DoodleStyle.SKETCH_CHALK
+                        EditorTool.DRAW_DASHED -> DoodleStyle.DASHED_TRAIL
+                        EditorTool.DRAW_PEN -> state.doodleStyle
+                        else -> DoodleStyle.SOLID_PEN
+                    }
+                    with(DoodleRenderer) {
+                        drawPointsPath(
+                            points = state.activeDrawingPoints,
+                            color = if (state.activeTool == EditorTool.RIG_REMOVAL) Color.Cyan.copy(alpha = 0.5f) else state.brushColor,
+                            baseStrokeWidth = state.brushSize,
+                            style = currentStyle,
+                            isGlow = currentStyle == DoodleStyle.NEON_GLOW,
+                            originX = 0f,
+                            originY = 0f,
+                            width = baseW,
+                            height = baseH
                         )
                     }
                 }
 
-                // 5. Guides
-                if (state.showGrid) drawGridGuides(canvasSize)
-                if (state.showSafeZone) drawSafeActionMargins(canvasSize)
-                if (state.showCenterCross) drawCenterCrosshair(canvasSize)
+                // -------------------------------------------------------------
+                // LAYER 6: GUIDES & FRAME BORDER
+                // -------------------------------------------------------------
+                if (state.showGrid) drawGridGuides(frameSize)
+                if (state.showSafeZone) drawSafeActionMargins(frameSize)
+                if (state.showCenterCross) drawCenterCrosshair(frameSize)
+
+                drawRect(
+                    color = StudioBorder.copy(alpha = 0.8f),
+                    topLeft = Offset.Zero,
+                    size = frameSize,
+                    style = Stroke(width = 1.5f / state.zoomScale)
+                )
             }
 
-            // 6. Live Cursor Ring
-            if (!isPanningActive) {
+            // 7. Live Cursor Ring (Rendered in screen space)
+            if (!isPanningActive && !isDraggingBackground) {
                 hoverCursorPos?.let { pos ->
+                    val frameScale = (baseW / 800f).coerceAtLeast(0.5f) * state.zoomScale
                     val radius = if (state.activeTool == EditorTool.ERASER) {
-                        state.brushSize * 1.5f * state.zoomScale
+                        state.brushSize * 1.5f * frameScale
                     } else {
-                        (state.brushSize * (canvasSize.width / 800f) / 2f) * state.zoomScale
+                        (state.brushSize * frameScale) / 2f
                     }
                     drawCircle(
-                        color = if (state.activeTool == EditorTool.ERASER) Color.Red.copy(alpha = 0.7f) else state.brushColor.copy(alpha = 0.8f),
-                        radius = radius.coerceAtLeast(2f),
+                        color = if (state.activeTool == EditorTool.ERASER) Color.Red.copy(alpha = 0.8f) else state.brushColor.copy(alpha = 0.9f),
+                        radius = radius.coerceAtLeast(3f),
                         center = pos,
                         style = Stroke(width = 1.5f)
                     )

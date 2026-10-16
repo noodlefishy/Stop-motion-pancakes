@@ -14,7 +14,7 @@ class StopMotionEditorTest {
     fun testDefaultProjectsPathConfiguration() {
         val state = com.stopmotion.animator.state.EditorState(skipInit = true)
         assertNotNull(state.settings.defaultProjectsPath)
-        assertTrue(state.settings.defaultProjectsPath.endsWith("Stop Motion"))
+        assertTrue("The problem was ${state.settings.defaultProjectsPath}",state.settings.defaultProjectsPath.endsWith("Stop Motion Magic"))
 
         val customDir = File(System.getProperty("java.io.tmpdir"), "Stop Motion Magic")
         state.updateSettings(state.settings.copy(defaultProjectsPath = customDir.absolutePath))

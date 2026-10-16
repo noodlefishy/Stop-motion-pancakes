@@ -54,7 +54,8 @@ class EditorState(
     var brushSize by mutableStateOf(6f)
     var isGlowActive by mutableStateOf(false)
     var doodleOnionSkinOnly by mutableStateOf(false) // Option to onion-skin ONLY doodles
-
+    var activeDrawingPoints by mutableStateOf<List<DrawingPoint>>(emptyList())
+    
     // Settings & Dialogs
     var settings by mutableStateOf(com.stopmotion.animator.util.SettingsManager.loadSettings())
     var isSettingsDialogVisible by mutableStateOf(false)

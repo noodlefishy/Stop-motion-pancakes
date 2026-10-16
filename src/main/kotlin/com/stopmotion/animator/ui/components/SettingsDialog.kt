@@ -630,7 +630,7 @@ private fun ExportSettingsPanel(settings: AppSettings, onUpdate: (AppSettings) -
 
                         TextButton(
                             onClick = {
-                                val defaultDir = java.io.File(System.getProperty("user.home"), "StopMotionProjects").absolutePath
+                                val defaultDir = java.io.File(System.getProperty("user.home"), "Documents/Stop Motion").absolutePath
                                 onUpdate(settings.copy(defaultProjectsPath = defaultDir))
                             }
                         ) {

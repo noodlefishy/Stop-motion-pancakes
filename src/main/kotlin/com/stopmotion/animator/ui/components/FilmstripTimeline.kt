@@ -14,20 +14,26 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.stopmotion.animator.model.DoodleStyle
+import com.stopmotion.animator.model.EditorTool
 import com.stopmotion.animator.state.EditorState
 import com.stopmotion.animator.ui.theme.*
+import com.stopmotion.animator.util.DoodleRenderer
+import com.stopmotion.animator.util.DoodleRenderer.drawPointsPath
+import com.stopmotion.animator.util.DoodleRenderer.drawStroke
 import com.stopmotion.animator.util.ImageCache
 
 @Composable
 fun FilmstripTimeline(state: EditorState, modifier: Modifier = Modifier) {
     val listState = rememberLazyListState()
 
-    // Auto-scroll filmstrip to selected frame when playback progresses
     LaunchedEffect(state.selectedFrameIndex) {
         if (state.selectedFrameIndex in state.project.frames.indices) {
             listState.animateScrollToItem((state.selectedFrameIndex - 2).coerceAtLeast(0))
@@ -51,7 +57,6 @@ fun FilmstripTimeline(state: EditorState, modifier: Modifier = Modifier) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // Left: Selection details and frame count
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -79,7 +84,6 @@ fun FilmstripTimeline(state: EditorState, modifier: Modifier = Modifier) {
                 }
             }
 
-            // Right: Batch actions (Move, Duplicate, Delete, Reverse, Quick Hold)
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -116,7 +120,6 @@ fun FilmstripTimeline(state: EditorState, modifier: Modifier = Modifier) {
 
                 Spacer(Modifier.width(8.dp))
 
-                // Quick hold presets
                 listOf(1, 2, 3).forEach { hold ->
                     Surface(
                         modifier = Modifier
@@ -143,6 +146,10 @@ fun FilmstripTimeline(state: EditorState, modifier: Modifier = Modifier) {
                 .weight(1f)
                 .padding(vertical = 6.dp)
         ) {
+            val targetAspect = state.project.aspectRatio.ratio
+            // Card width adapts to aspect ratio (e.g., 65dp for 9:16 vertical, 115dp for 16:9 widescreen)
+            val cardWidth = (72f * targetAspect).coerceIn(65f, 115f).dp
+
             LazyRow(
                 state = listState,
                 contentPadding = PaddingValues(horizontal = 12.dp),
@@ -154,13 +161,13 @@ fun FilmstripTimeline(state: EditorState, modifier: Modifier = Modifier) {
                     val isCleanPlate = state.project.cleanPlateFrameId == frame.id
 
                     val thumb = remember(frame.imagePath) {
-                        ImageCache.getThumbnail(frame.imagePath, 110, 75)
+                        ImageCache.getThumbnail(frame.imagePath, 160, 100)
                     }
 
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier
-                            .width(105.dp)
+                            .width(cardWidth)
                             .clip(RoundedCornerShape(6.dp))
                             .background(StudioCard)
                             .border(
@@ -168,11 +175,9 @@ fun FilmstripTimeline(state: EditorState, modifier: Modifier = Modifier) {
                                 color = if (isSelected) StudioPrimary else StudioBorder,
                                 shape = RoundedCornerShape(6.dp)
                             )
-                            .clickable {
-                                state.selectFrame(idx)
-                            }
+                            .clickable { state.selectFrame(idx) }
                     ) {
-                        // Thumbnail image container
+                        // Thumbnail Canvas: Photo + Drawings + Live Real-time Stroke
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -180,20 +185,66 @@ fun FilmstripTimeline(state: EditorState, modifier: Modifier = Modifier) {
                                 .background(Color.Black),
                             contentAlignment = Alignment.Center
                         ) {
-                            if (thumb != null) {
-                                androidx.compose.foundation.Image(
-                                    bitmap = thumb,
-                                    contentDescription = "Frame #$idx",
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize()
-                                )
-                            } else {
-                                Icon(
-                                    Icons.Default.Image,
-                                    null,
-                                    tint = StudioTextMuted,
-                                    modifier = Modifier.size(24.dp)
-                                )
+                            Canvas(modifier = Modifier.fillMaxSize()) {
+                                val canvasW = size.width
+                                val canvasH = size.height
+
+                                // Fitted destination rectangle respecting project aspect ratio
+                                val (dstW, dstH) = if (canvasW / canvasH > targetAspect) {
+                                    Pair(canvasH * targetAspect, canvasH)
+                                } else {
+                                    Pair(canvasW, canvasW / targetAspect)
+                                }
+                                val dstX = (canvasW - dstW) / 2f
+                                val dstY = (canvasH - dstH) / 2f
+
+                                // 1. Render base photo
+                                if (thumb != null) {
+                                    drawImage(
+                                        image = thumb,
+                                        dstOffset = IntOffset(dstX.toInt(), dstY.toInt()),
+                                        dstSize = IntSize(dstW.toInt(), dstH.toInt())
+                                    )
+                                } else {
+                                    drawRect(
+                                        color = Color(0xFF1E2126),
+                                        topLeft = Offset(dstX, dstY),
+                                        size = Size(dstW, dstH)
+                                    )
+                                }
+
+                                // 2. Render committed drawings for this frame
+                                for (stroke in frame.drawings) {
+                                    drawStroke(
+                                        stroke = stroke,
+                                        originX = dstX,
+                                        originY = dstY,
+                                        width = dstW,
+                                        height = dstH
+                                    )
+                                }
+
+                                // 3. Render in-progress stroke in real time if currently drawing on this frame
+                                if (idx == state.selectedFrameIndex && state.activeDrawingPoints.size >= 2) {
+                                    val currentStyle = when (state.activeTool) {
+                                        EditorTool.DRAW_GLOW -> DoodleStyle.NEON_GLOW
+                                        EditorTool.DRAW_CHALK -> DoodleStyle.SKETCH_CHALK
+                                        EditorTool.DRAW_DASHED -> DoodleStyle.DASHED_TRAIL
+                                        EditorTool.DRAW_PEN -> state.doodleStyle
+                                        else -> DoodleStyle.SOLID_PEN
+                                    }
+                                    drawPointsPath(
+                                        points = state.activeDrawingPoints,
+                                        color = if (state.activeTool == EditorTool.RIG_REMOVAL) Color.Cyan.copy(alpha = 0.5f) else state.brushColor,
+                                        baseStrokeWidth = state.brushSize,
+                                        style = currentStyle,
+                                        isGlow = currentStyle == DoodleStyle.NEON_GLOW,
+                                        originX = dstX,
+                                        originY = dstY,
+                                        width = dstW,
+                                        height = dstH
+                                    )
+                                }
                             }
 
                             // Quick Delete Frame button
@@ -320,7 +371,6 @@ private fun AudioWaveformRow(state: EditorState) {
             )
         }
 
-        // Waveform Canvas
         Canvas(
             modifier = Modifier
                 .weight(1f)
@@ -331,7 +381,6 @@ private fun AudioWaveformRow(state: EditorState) {
             val h = size.height
             val midY = h / 2f
 
-            // Baseline
             drawLine(
                 color = StudioBorder,
                 start = Offset(0f, midY),
@@ -339,7 +388,6 @@ private fun AudioWaveformRow(state: EditorState) {
                 strokeWidth = 1f
             )
 
-            // Audio Peaks
             if (peaks.isNotEmpty()) {
                 val stepX = w / peaks.size.coerceAtLeast(1)
                 for (i in peaks.indices) {
@@ -355,7 +403,6 @@ private fun AudioWaveformRow(state: EditorState) {
                 }
             }
 
-            // Playhead indicator line
             val playheadProgress = state.currentTimelineIndex.toFloat() / totalTimelineFrames
             val playheadX = playheadProgress * w
             drawLine(

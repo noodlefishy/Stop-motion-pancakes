@@ -73,17 +73,21 @@ object ImageProcessor {
     /**
      * Applies brightness, contrast, drawings, and optional clean-plate rig removal.
      */
+    /**
+     * Applies brightness, contrast, drawings, and optional clean-plate rig removal.
+     */
     fun processFrame(
         frame: FrameItem,
-        cleanPlate: BufferedImage? = null
+        cleanPlate: BufferedImage? = null,
+        includeDrawings: Boolean = true
     ): BufferedImage? {
         val base = ImageCache.getBufferedImage(frame.imagePath) ?: return null
         val w = base.width
         val h = base.height
 
-        // Fast path: if no adjustments and no drawings, return base
+        // Fast path: if no adjustments and no drawings requested, return base
         if (frame.brightness == 0f && frame.contrast == 1f && frame.saturation == 1f &&
-            frame.temperature == 0f && frame.drawings.isEmpty()
+            frame.temperature == 0f && (!includeDrawings || frame.drawings.isEmpty())
         ) {
             return base
         }
@@ -109,7 +113,6 @@ object ImageProcessor {
         if (rigStrokes.isNotEmpty() && cleanPlate != null) {
             for (stroke in rigStrokes) {
                 if (stroke.points.size < 2) continue
-                // Create a clip path or sample from clean plate
                 for (pt in stroke.points) {
                     val px = (pt.x * w).toInt()
                     val py = (pt.y * h).toInt()
@@ -125,59 +128,56 @@ object ImageProcessor {
             }
         }
 
-        // Standard drawings & glow effects
-        val regularStrokes = frame.drawings.filter { !it.isRigRemoval }
-        for (stroke in regularStrokes) {
-            if (stroke.points.size < 2) continue
-            val awtColor = parseHexColor(stroke.colorHex)
+        // Standard drawings & glow effects (only if requested)
+        if (includeDrawings) {
+            val regularStrokes = frame.drawings.filter { !it.isRigRemoval }
+            for (stroke in regularStrokes) {
+                if (stroke.points.size < 2) continue
+                val awtColor = parseHexColor(stroke.colorHex)
+                val strokeWidthPixels = stroke.strokeWidth * (w / 800f).coerceAtLeast(1f)
 
-            val strokeWidthPixels = stroke.strokeWidth * (w / 800f).coerceAtLeast(1f)
+                when (stroke.style) {
+                    com.stopmotion.animator.model.DoodleStyle.NEON_GLOW -> {
+                        val auraAlpha = (awtColor.alpha * 0.25f).toInt().coerceIn(10, 255)
+                        g.color = Color(awtColor.red, awtColor.green, awtColor.blue, auraAlpha)
+                        g.stroke = BasicStroke(strokeWidthPixels * 4.0f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
+                        drawStrokePath(g, stroke.points, w, h)
 
-            when (stroke.style) {
-                com.stopmotion.animator.model.DoodleStyle.NEON_GLOW -> {
-                    // Outer diffuse aura
-                    val auraAlpha = (awtColor.alpha * 0.25f).toInt().coerceIn(10, 255)
-                    g.color = Color(awtColor.red, awtColor.green, awtColor.blue, auraAlpha)
-                    g.stroke = BasicStroke(strokeWidthPixels * 4.0f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
-                    drawStrokePath(g, stroke.points, w, h)
-
-                    // Inner bright glow
-                    val glowAlpha = (awtColor.alpha * 0.6f).toInt().coerceIn(20, 255)
-                    g.color = Color(awtColor.red, awtColor.green, awtColor.blue, glowAlpha)
-                    g.stroke = BasicStroke(strokeWidthPixels * 2.0f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
-                    drawStrokePath(g, stroke.points, w, h)
-
-                    // White hot core
-                    g.color = Color(255, 255, 255, (awtColor.alpha * 0.9f).toInt())
-                    g.stroke = BasicStroke(strokeWidthPixels * 0.8f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
-                    drawStrokePath(g, stroke.points, w, h)
-                }
-                com.stopmotion.animator.model.DoodleStyle.DASHED_TRAIL -> {
-                    val dashPattern = floatArrayOf(strokeWidthPixels * 3f, strokeWidthPixels * 2f)
-                    g.color = awtColor
-                    g.stroke = BasicStroke(strokeWidthPixels, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 10f, dashPattern, 0f)
-                    drawStrokePath(g, stroke.points, w, h)
-                }
-                com.stopmotion.animator.model.DoodleStyle.SKETCH_CHALK -> {
-                    // Two slightly jittered strokes for chalk/crayon feel
-                    val chalkAlpha = (awtColor.alpha * 0.65f).toInt().coerceIn(20, 255)
-                    g.color = Color(awtColor.red, awtColor.green, awtColor.blue, chalkAlpha)
-                    g.stroke = BasicStroke(strokeWidthPixels * 1.3f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
-                    drawStrokePath(g, stroke.points, w, h)
-                    g.color = awtColor
-                    g.stroke = BasicStroke(strokeWidthPixels * 0.9f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
-                    drawStrokePath(g, stroke.points, w, h)
-                }
-                com.stopmotion.animator.model.DoodleStyle.SOLID_PEN -> {
-                    if (stroke.isGlow) {
-                        val glowAlpha = (awtColor.alpha * 0.35f).toInt().coerceIn(10, 255)
+                        val glowAlpha = (awtColor.alpha * 0.6f).toInt().coerceIn(20, 255)
                         g.color = Color(awtColor.red, awtColor.green, awtColor.blue, glowAlpha)
-                        g.stroke = BasicStroke(strokeWidthPixels * 3.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
+                        g.stroke = BasicStroke(strokeWidthPixels * 2.0f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
+                        drawStrokePath(g, stroke.points, w, h)
+
+                        g.color = Color(255, 255, 255, (awtColor.alpha * 0.9f).toInt())
+                        g.stroke = BasicStroke(strokeWidthPixels * 0.8f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
                         drawStrokePath(g, stroke.points, w, h)
                     }
-                    g.color = awtColor
-                    g.stroke = BasicStroke(strokeWidthPixels, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
-                    drawStrokePath(g, stroke.points, w, h)
+                    com.stopmotion.animator.model.DoodleStyle.DASHED_TRAIL -> {
+                        val dashPattern = floatArrayOf(strokeWidthPixels * 3f, strokeWidthPixels * 2f)
+                        g.color = awtColor
+                        g.stroke = BasicStroke(strokeWidthPixels, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 10f, dashPattern, 0f)
+                        drawStrokePath(g, stroke.points, w, h)
+                    }
+                    com.stopmotion.animator.model.DoodleStyle.SKETCH_CHALK -> {
+                        val chalkAlpha = (awtColor.alpha * 0.65f).toInt().coerceIn(20, 255)
+                        g.color = Color(awtColor.red, awtColor.green, awtColor.blue, chalkAlpha)
+                        g.stroke = BasicStroke(strokeWidthPixels * 1.3f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
+                        drawStrokePath(g, stroke.points, w, h)
+                        g.color = awtColor
+                        g.stroke = BasicStroke(strokeWidthPixels * 0.9f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
+                        drawStrokePath(g, stroke.points, w, h)
+                    }
+                    com.stopmotion.animator.model.DoodleStyle.SOLID_PEN -> {
+                        if (stroke.isGlow) {
+                            val glowAlpha = (awtColor.alpha * 0.35f).toInt().coerceIn(10, 255)
+                            g.color = Color(awtColor.red, awtColor.green, awtColor.blue, glowAlpha)
+                            g.stroke = BasicStroke(strokeWidthPixels * 3.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
+                            drawStrokePath(g, stroke.points, w, h)
+                        }
+                        g.color = awtColor
+                        g.stroke = BasicStroke(strokeWidthPixels, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
+                        drawStrokePath(g, stroke.points, w, h)
+                    }
                 }
             }
         }

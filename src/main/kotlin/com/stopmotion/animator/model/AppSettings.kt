@@ -42,7 +42,7 @@ data class AppSettings(
     val themePreset: AppThemePreset = AppThemePreset.OBSIDIAN_INDIGO
 )
 
-@Serializable
+@Serializable 
 enum class AppThemePreset(val displayName: String, val subtitle: String) {
     OBSIDIAN_INDIGO("Obsidian Indigo", "Deep dark canvas with electric indigo & cyan accents"),
     CYBER_CYAN("Cyber Cyan", "Pitch black synthwave with neon cyan & vivid magenta"),

@@ -143,6 +143,28 @@ private fun SettingsTabContent(state: EditorState) {
                         label = { Text("True Color", fontSize = 10.sp) }
                     )
                 }
+
+                Spacer(Modifier.height(8.dp))
+
+                // Doodles-only switch
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Doodles Only", fontSize = 12.sp, color = StudioTextPrimary)
+                        Text("Ghost hand drawings without photo overlay", fontSize = 10.sp, color = StudioTextMuted)
+                    }
+                    Switch(
+                        checked = state.doodleOnionSkinOnly,
+                        onCheckedChange = { state.doodleOnionSkinOnly = it },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = StudioPrimary,
+                            checkedTrackColor = StudioPrimary.copy(alpha = 0.4f)
+                        )
+                    )
+                }
             }
         }
 

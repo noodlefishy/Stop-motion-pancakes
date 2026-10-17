@@ -47,7 +47,7 @@
 * **Doodles-Only Ghosting:** Ghost only vector drawings to keep the photographic stage clean and unobstructed.
 * **Diagnostic Modes:** Difference/flicker detection and interactive split-screen frame comparison.
 
-### ⏱Timeline, Exposure & Audio Sync
+### Timeline, Exposure & Audio Sync
 * **Exposure Beats (Holds):** Animate on **1s**, **2s**, or **3s** with exposure multipliers.
 * **Batch Operations:** Reverse sequences, duplicate frames, multi-select, and reorder on the fly.
 * **Frame-Accurate Audio Scrubbing:** Scrub PCM audio waveforms frame-by-frame for precise lip-syncing.

@@ -27,11 +27,23 @@ compose.desktop {
                 org.jetbrains.compose.desktop.application.dsl.TargetFormat.Exe,
                 org.jetbrains.compose.desktop.application.dsl.TargetFormat.Deb
             )
-            packageName = "Stop Motion Pancake"
-            packageVersion = "1.0.0"
+            packageName = "Stop Motion Pancakes"
+            packageVersion = "1.2.0"
             description = "Pretty pretty stop motion"
-            copyright = "2026 Stop Motion Pancake"
-            vendor = "Stop Motion Pancake"
+            copyright = "2026 Stop Motion Pancakes"
+            vendor = "Stop Motion Pancakes"
+
+            windows {
+                iconFile.set(project.file("assets/Macroplastics pancake-3.ico"))
+            }
+            macOS {
+                iconFile.set(project.file("assets/Macroplastics pancake-3.icns"))
+            }
+            linux {
+                iconFile.set(project.file("assets/Macroplastics pancake-3.png"))
+            }
+
+
 
             macOS {
                 bundleID = "com.stopmotion.pancake"
